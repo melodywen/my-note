@@ -39,7 +39,7 @@ function init_repositories {
 
     # 1.1 添加源
     add-apt-repository -y ppa:ondrej/php
-    add-apt-repository -y ppa:nginx/stable
+    #add-apt-repository -y ppa:nginx/stable
 
     # 1.2 中科大提供的反向代理地址是：http://launchpad.proxy.ustclug.org
     grep -rl ppa.launchpad.net /etc/apt/sources.list.d/ | xargs sed -i 's/ppa.launchpad.net/launchpad.proxy.ustclug.org/g'

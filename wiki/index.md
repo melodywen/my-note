@@ -44,6 +44,9 @@ updated: 2026-06-01
 4. [[04 ms-SWIFT|ms-SWIFT(魔搭生态全家桶)]]
 5. [[05 ColossalAI|ColossalAI(大规模分布式训练引擎)]]
 
+**📊 模型评测**
+1. [[01 EvalScope|EvalScope(大模型评测框架)]]
+
 ### ❓ 问答/综合 (questions)
 - [[Research: 大模型微调]] — 微调研究综合页
 

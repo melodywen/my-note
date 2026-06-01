@@ -40,6 +40,8 @@ updated: 2026-06-01
 **🛠️ 微调框架**
 1. [[01 四大微调框架概述|四大微调框架概述]]
 2. [[02 Unsloth|Unsloth(单机单卡微调之王)]]
+3. [[03 LLaMA-Factory|LLaMA-Factory(全能型瑞士军刀)]]
+4. [[04 ms-SWIFT|ms-SWIFT(魔搭生态全家桶)]]
 
 ### ❓ 问答/综合 (questions)
 - [[Research: 大模型微调]] — 微调研究综合页

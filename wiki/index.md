@@ -42,6 +42,7 @@ updated: 2026-06-01
 2. [[02 Unsloth|Unsloth(单机单卡微调之王)]]
 3. [[03 LLaMA-Factory|LLaMA-Factory(全能型瑞士军刀)]]
 4. [[04 ms-SWIFT|ms-SWIFT(魔搭生态全家桶)]]
+5. [[05 ColossalAI|ColossalAI(大规模分布式训练引擎)]]
 
 ### ❓ 问答/综合 (questions)
 - [[Research: 大模型微调]] — 微调研究综合页

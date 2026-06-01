@@ -26,7 +26,7 @@ LoRA 的原始论文(arXiv:2106.09685)。提出冻结预训练权重、在 Trans
 
 ## 提取的概念/实体
 
-- [[LoRA 与 QLoRA]]
+- [[03 LoRA 与 QLoRA|LoRA 与 QLoRA]]
 
 ## 原始素材位置
 

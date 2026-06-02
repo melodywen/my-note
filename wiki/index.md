@@ -52,6 +52,7 @@ updated: 2026-06-01
 **🚀 实战演练**
 1. [[01 Qwen3 高效微调环境准备|Qwen3 高效微调环境准备]]
 2. [[02 ms-SWIFT 安装部署|ms-SWIFT 安装部署]]
+3. [[03 ms-SWIFT 测试运行示例|ms-SWIFT 测试运行示例]]
 
 ### ❓ 问答/综合 (questions)
 - [[Research: 大模型微调]] — 微调研究综合页

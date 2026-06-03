@@ -2,7 +2,7 @@
 type: concept
 status: developing
 area: growth
-tags: [learning, 微调, 实战, ms-swift, 示例, sft, infer, lora]
+tags: [learning, 微调, 实战, ms-swift, 示例, sft, infer, lora, qwen3, qwen3-vl, qwen3.5, 多模态]
 created: 2026-06-02
 updated: 2026-06-02
 ---
@@ -10,6 +10,15 @@ updated: 2026-06-02
 # 03 ms-SWIFT 测试运行示例
 
 > 本页是**实战演练篇**:[[02 ms-SWIFT 安装部署|装好 ms-SWIFT]] 之后,跑几个最小示例确认环境真能用。一句话记住:**`swift sft` 训、`swift infer` 推、`swift eval` 评、`swift deploy` 部署 —— 先用小模型 + 内置数据集跑通,再换自己的模型和数据。**
+>
+> 📖 **官方参考手册(快速开始)**:https://swift.readthedocs.io/zh-cn/latest/GetStarted/Quick-start.html —— 本页示例命令以该手册为基准。
+
+> [!warning] 版本差异:`--train_type` 已改名为 `--tuner_type`
+> 老教程/旧版 ms-SWIFT(3.x)用 **`--train_type lora`**;但 **4.2.x 版本已把该参数改名为 `--tuner_type`**(默认值就是 `lora`)。本机实测 **4.2.3** 版本,用 `--train_type` 会直接报错:
+> ```
+> ValueError: remaining_argv: ['--train_type', 'lora']
+> ```
+> 官方手册当前示例也已统一改用 `--tuner_type`。下文命令均已采用新参数名。查看自己的版本:`pip show ms-swift`。
 
 ## 0. 跑示例前的准备
 
@@ -31,12 +40,14 @@ swift --help                    # 能打印帮助说明装好了
 
 ### CUDA(NVIDIA 显卡)运行指令
 
+> 以下为**官方手册当前示例命令**(已用新参数名 `--tuner_type`)。
+
 ```bash
-# 显存约 13GB
+# 显存约 13GB,单卡 3090/4090 可跑
 CUDA_VISIBLE_DEVICES=0 \
 swift sft \
     --model Qwen/Qwen3-4B-Instruct-2507 \
-    --train_type lora \
+    --tuner_type lora \
     --dataset 'AI-ModelScope/alpaca-gpt4-data-zh#500' \
               'AI-ModelScope/alpaca-gpt4-data-en#500' \
               'swift/self-cognition#500' \
@@ -63,17 +74,18 @@ swift sft \
 
 ### Mac(Apple Silicon / MPS)运行指令
 
-Mac 没有 NVIDIA 显卡,走苹果的 **MPS** 后端。相比 CUDA 版有三处必须改:
+Mac 没有 NVIDIA 显卡,走苹果的 **MPS** 后端。相比 CUDA 版有几处必须改。下面是**本机(M4 Pro / 48GB)实测可跑通**的版本:
 
 ```bash
-# 1) 去掉 CUDA_VISIBLE_DEVICES(Mac 无 CUDA)
+# 注意:直接敲 swift 可能调到系统 /usr/bin/swift,建议用 conda 环境的绝对路径
+# 例: /opt/homebrew/Caskroom/miniconda/base/envs/ms-swift/bin/swift sft ...
 swift sft \
-    --model Qwen/Qwen3-4B-Instruct-2507 \
-    --train_type lora \
+    --model Qwen/Qwen3-0.6B \
+    --tuner_type lora \
     --dataset 'AI-ModelScope/alpaca-gpt4-data-zh#500' \
               'AI-ModelScope/alpaca-gpt4-data-en#500' \
               'swift/self-cognition#500' \
-    --torch_dtype float16 \
+    --torch_dtype float32 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 1 \
@@ -94,28 +106,49 @@ swift sft \
     --model_name swift-robot
 ```
 
-> [!key-insight] Mac 版相比 CUDA 版改了哪三处、为什么
+> [!key-insight] Mac 版相比 CUDA 版改了哪几处、为什么
 > | 改动 | CUDA | Mac | 原因 |
 > |---|---|---|---|
 > | **设备指定** | `CUDA_VISIBLE_DEVICES=0` | **删掉** | Mac 无 CUDA 设备,MPS 会自动启用 |
-> | **精度** | `--torch_dtype bfloat16` | `--torch_dtype float16` | MPS 对 bfloat16 支持不完整,易报错;用 float16 更稳 |
+> | **模型大小** | `Qwen3-4B-Instruct-2507` | **`Qwen3-0.6B`** | 4B 在 Mac 上很慢且吃内存;0.6B(float32 仅约 2.4GB)练手轻松,验证流程足够 |
+> | **精度** | `--torch_dtype bfloat16` | **`--torch_dtype float32`** | MPS 对 bfloat16 支持差(算子常缺失报错),float16 训练又易 NaN,**float32 最稳** |
 > | **数据加载进程** | `--dataloader_num_workers 4` | `--dataloader_num_workers 0` | macOS 多进程 DataLoader 常出问题,设 0 用主进程更稳 |
+> | **参数名** | — | `--tuner_type`(非 `--train_type`) | 见本页顶部版本差异提示 |
 >
-> 另外 **4B 模型在 Mac 上很吃内存**(建议 32GB 以上统一内存),且训练速度比 NVIDIA 卡慢很多 —— Mac 更适合**验证流程能跑通**,真正训练还是上 CUDA。内存吃紧可把 `--max_length` 调小(如 1024)。
+> 另外 **Mac 上 MPS 跑训练本身就容易踩算子坑** —— ms-SWIFT 没针对 MPS 做完整适配,即使类型选对,也可能卡在某个不支持的算子上。Mac 更适合**验证流程能跑通**,真正训练还是上 CUDA(`bfloat16` + NVIDIA 才是 ms-SWIFT 的主力场景)。
 
-> [!key-insight] 命令里的关键参数在干嘛
-> | 参数 | 含义 |
-> |---|---|
-> | `--model` | 微调的基座模型,这里是 [[Qwen]] 4B 指令版 |
-> | `--train_type lora` | 用 [[03 LoRA 与 QLoRA\|LoRA]] 高效微调,显存友好 |
-> | `--dataset '...#500' '...' '...'` | 同时挂载多个数据集,各取前 500 条;含中/英 alpaca + `self-cognition`(教模型认识自己) |
-> | `--lora_rank 8` / `--lora_alpha 32` | LoRA 的秩与缩放系数,控制可训练参数量和学习强度 |
-> | `--target_modules all-linear` | 对**所有线性层**插 LoRA,覆盖更全、效果更好 |
-> | `--gradient_accumulation_steps 16` | 梯度累积,等效放大 batch(1×16=16),小显存也能稳训 |
-> | `--eval_steps` / `--save_steps` | 每 50 步评估/保存一次 checkpoint |
-> | `--save_total_limit 2` | 最多保留 2 个 checkpoint,省磁盘 |
-> | `--warmup_ratio 0.05` | 前 5% 步数学习率预热,训练更稳 |
-> | `--model_author` / `--model_name` | 配合 `self-cognition` 数据集,把模型身份设成 `swift / swift-robot`,问它"你是谁"会这么答 |
+> [!tip] `swift` 命令找不到 / 调错了?(`No such file or directory` / 用到系统 swift)
+> macOS 自带一个 `/usr/bin/swift`(那是 Apple 的 Swift 语言编译器),若它在 PATH 里排在 conda 环境前面,敲 `swift sft` 会调错,报 `unable to invoke subcommand: swift-sft`。两种解法:
+> - **临时**:用绝对路径 `/opt/homebrew/Caskroom/miniconda/base/envs/ms-swift/bin/swift sft ...`
+> - **永久**:在 `~/.zshrc` 里把 conda 环境 bin 放到 PATH 最前 `export PATH="/opt/homebrew/Caskroom/miniconda/base/envs/ms-swift/bin:$PATH"`,然后 `source ~/.zshrc`
+
+> [!key-insight] 每个参数逐一解释(一个都不漏)
+> | 参数 | 取值 | 单独解释 |
+> |---|---|---|
+> | `--model` | `Qwen/Qwen3-4B-Instruct-2507` | 要微调的**基座模型** ID,这里是 [[Qwen]] 3 代 4B 指令版(2507 是版本号),会从魔搭/HF 自动下载 |
+> | `--tuner_type`(旧名 `--train_type`) | `lora` | **微调方式**用 [[03 LoRA 与 QLoRA\|LoRA]](只训练插入的小矩阵,省显存);填 `full` 则是全参数微调。⚠️ 4.2.x 已从 `--train_type` 改名为 `--tuner_type`,见本页顶部提示 |
+> | `--dataset`(第 1 个) | `AI-ModelScope/alpaca-gpt4-data-zh#500` | **中文** alpaca-gpt4 指令数据集,`#500` 表示只取前 500 条 |
+> | `--dataset`(第 2 个) | `AI-ModelScope/alpaca-gpt4-data-en#500` | **英文** alpaca-gpt4 指令数据集,同样取前 500 条;与中文一起喂保证中英能力 |
+> | `--dataset`(第 3 个) | `swift/self-cognition#500` | **自我认知**数据集,教模型回答"你是谁/谁造的",取前 500 条;配合下方 `model_author/model_name` 生效 |
+> | `--torch_dtype` | `bfloat16`(CUDA)/`float32`(Mac) | 模型权重的**计算精度**;CUDA 上用 bfloat16 省显存又稳;Mac/MPS 对 bfloat16 支持差、float16 易 NaN,**建议 float32** |
+> | `--num_train_epochs` | `1` | **训练轮数**,把数据集完整过几遍,这里过 1 遍(练手够用) |
+> | `--per_device_train_batch_size` | `1` | **每张卡训练**时一次喂几条样本,显存小就设 1 |
+> | `--per_device_eval_batch_size` | `1` | **每张卡评估**时一次喂几条样本,同样设 1 |
+> | `--learning_rate` | `1e-4` | **学习率**,即每步参数更新的幅度;LoRA 微调常用 1e-4 量级 |
+> | `--lora_rank` | `8` | **LoRA 的秩 r**,即插入的低秩矩阵维度;越大可训练参数越多、表达力越强也越吃显存,8 是常用小值 |
+> | `--lora_alpha` | `32` | **LoRA 缩放系数**,实际作用强度≈alpha/rank(32/8=4);配合 rank 控制 LoRA 影响力度 |
+> | `--target_modules` | `all-linear` | **给哪些层插 LoRA**,`all-linear` 表示所有线性层都插,覆盖最全、效果通常更好 |
+> | `--gradient_accumulation_steps` | `16` | **梯度累积步数**,累积 16 步再更新一次参数,等效 batch=1×16=16;小显存模拟大 batch 的关键 |
+> | `--eval_steps` | `50` | 每训练 **50 步**在验证集上评估一次 |
+> | `--save_steps` | `50` | 每训练 **50 步**保存一次 checkpoint(与 eval_steps 对齐) |
+> | `--save_total_limit` | `2` | **最多保留 2 个** checkpoint,超出自动删旧的,省磁盘 |
+> | `--logging_steps` | `5` | 每 **5 步**打印一次训练日志(loss 等),方便实时观察 |
+> | `--max_length` | `2048` | 单条样本的**最大 token 长度**,超过会截断;越大越吃显存 |
+> | `--output_dir` | `output` | 训练**产物输出目录**(LoRA 权重、日志、checkpoint 都放这) |
+> | `--warmup_ratio` | `0.05` | **学习率预热比例**,前 5% 的训练步里学习率从 0 慢慢升到设定值,开头训练更稳 |
+> | `--dataloader_num_workers` | `0`(Mac)/`4`(CUDA) | **数据加载的子进程数**,越多读数据越快;macOS 多进程易出错故设 0,Linux/CUDA 设 4 |
+> | `--model_author` | `swift` | 配合 `self-cognition`,设定模型的**作者/创建者**身份,问"谁造的你"会答 swift |
+> | `--model_name` | `swift-robot` | 配合 `self-cognition`,设定模型的**名字**,问"你是谁"会答 swift-robot |
 >
 > 训练完成后,LoRA 权重保存在 `output/vx-xxxx/checkpoint-xxx/` 目录下。
 
@@ -192,7 +225,7 @@ from swift.llm import sft_main, TrainArguments
 
 sft_main(TrainArguments(
     model='Qwen/Qwen2.5-0.5B-Instruct',
-    train_type='lora',
+    tuner_type='lora',
     dataset=['AI-ModelScope/alpaca-gpt4-data-zh#500'],
     num_train_epochs=1,
     output_dir='output',
@@ -211,6 +244,29 @@ sft_main(TrainArguments(
 > 5. **`swift eval` / `swift deploy`** —— 量化评测 / 起服务,按需选用。
 >
 > 全程用 **0.5B 小模型 + 几百条数据**,几分钟就能跑完一轮,验证完再换大模型和真实数据集。
+
+## 7. Qwen3 家族怎么选:带不带 VL、3 还是 3.5
+
+> 跑示例时 `--model` 填哪个,直接决定了能力边界和命令写法。**带不带 VL(能否看图/看视频)、Qwen3 与 Qwen3.5 的架构差异、以及选型速查**,已单独拆成一篇:
+>
+> 👉 **[[03.1 Qwen3 家族选型(VL 与 3.5)|Qwen3 家族选型:带不带 VL、3 还是 3.5]]**
+
+## 8. 训练时怎么盯显卡?
+
+> 训练跑起来后,要监控显存/利用率/温度。`nvidia-smi`、`nvitop` 等工具的用法已单独拆成一篇:
+>
+> 👉 **[[03.2 显卡监控工具|显卡 / 算力监控工具]]**
+
+## 本机实测踩坑小结(M4 Pro / 48GB / ms-SWIFT 4.2.3)
+
+> [!key-insight] 这次跑通前踩的几个坑(按出现顺序)
+> 1. **`swift-sft: No such file or directory`** —— PATH 里系统 `/usr/bin/swift`(Apple 的 Swift 编译器)排在 conda 环境前面,调错了命令。→ 用 conda 环境绝对路径,或把环境 bin 放 PATH 最前。
+> 2. **`ValueError: remaining_argv: ['--train_type', 'lora']`** —— 4.2.3 已把 `--train_type` 改名为 `--tuner_type`(默认就是 lora,也可直接删掉这行)。
+> 3. **bfloat16 在 Mac 上不靠谱** —— MPS 对 bf16 算子支持不全;float16 训练易 NaN。最终用 **`float32`** 才稳。
+> 4. **4B 在 Mac 上太重** —— 换成 **`Qwen3-0.6B`** 练手,float32 仅约 2.4GB,M4 Pro 轻松跑。
+> 5. **`Requirement already satisfied` 不是错** —— 那只是 pip 跳过已装依赖的正常日志,只需关注 `ERROR`/`Conflict` 行。
+>
+> 一句话:**Mac 是用来验证流程能跑通的,真正训练上 CUDA。**
 
 ## 继续学习
 

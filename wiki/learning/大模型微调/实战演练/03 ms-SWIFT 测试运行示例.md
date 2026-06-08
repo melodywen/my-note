@@ -152,6 +152,87 @@ swift sft \
 >
 > 训练完成后,LoRA 权重保存在 `output/vx-xxxx/checkpoint-xxx/` 目录下。
 
+> [!key-insight] 深入理解 `gradient_accumulation_steps` 与训练步数
+>
+> ### 什么是梯度累积?
+>
+> 正常训练时,每处理一个 batch 就会计算梯度并**立即更新参数**(做一次 optimizer step)。但显存不够大时,batch_size 只能设很小(比如 1),这会导致梯度估计噪声大、训练不稳。
+>
+> **梯度累积**的思路:先连续跑 N 个 mini-batch,把每次算出的梯度**累加起来**,攒够 N 步后再统一做一次参数更新。效果上等价于用了 N 倍大的 batch,但**显存只占一个 mini-batch 的量**。
+>
+> ### 核心公式:等效批量大小
+>
+> ```
+> effective_batch_size = per_device_train_batch_size × gradient_accumulation_steps × num_gpus
+> ```
+>
+> 以本页示例为例:
+> ```
+> effective_batch_size = 1 × 16 × 1(单卡) = 16
+> ```
+> 即:虽然每次只喂 1 条样本(显存只需承担 1 条的开销),但攒 16 次梯度后才更新一次参数,**训练效果等同于 batch_size=16**。
+>
+> ### 核心公式:总训练步数(optimizer steps)
+>
+> ```
+> total_optimizer_steps = ⌈total_samples / effective_batch_size⌉ × num_train_epochs
+> ```
+>
+> 以本页示例为例(三个数据集各 500 条,共 1500 条,1 个 epoch):
+> ```
+> total_optimizer_steps = ⌈1500 / 16⌉ × 1 = 94 步
+> ```
+>
+> **注意区分两种"步":**
+> | 概念 | 含义 | 本例数量 |
+> |---|---|---|
+> | **forward step**(前向步) | 每喂一个 mini-batch 就算一步 | 1500 步 |
+> | **optimizer step**(优化器步/参数更新步) | 累积够 `gradient_accumulation_steps` 次后做一次参数更新 | 94 步 |
+>
+> **ms-SWIFT / HuggingFace Trainer 里所有 `xxx_steps` 参数(如 `logging_steps`、`eval_steps`、`save_steps`)计数的都是 optimizer step,不是 forward step。**
+>
+> ### 各 `xxx_steps` 参数与梯度累积的关系
+>
+> | 参数 | 本例取值 | 实际含义 |
+> |---|---|---|
+> | `logging_steps=5` | 每 5 次**参数更新**打印一次日志 → 实际每处理 5×16=80 条样本打印一次 |
+> | `eval_steps=50` | 每 50 次**参数更新**评估一次 → 实际每处理 50×16=800 条样本评估一次 |
+> | `save_steps=50` | 每 50 次**参数更新**保存一次 → 同上 |
+>
+> ### 怎么选 `gradient_accumulation_steps`?
+>
+> | 场景 | 建议 |
+> |---|---|
+> | 显存够大,能直接开大 batch | 不需要累积,设 1 即可 |
+> | 显存小(如消费级卡跑大模型) | `per_device_train_batch_size=1`,靠 `gradient_accumulation_steps` 把等效 batch 拉到 8~32 |
+> | 多卡训练 | 等效 batch = batch_size × accumulation × 卡数,注意别让等效 batch 过大(>64 时 LR 需配合调整) |
+>
+> **经验法则**:等效 batch_size 在 **8~32** 之间通常是微调的甜区;太小梯度噪声大,太大收敛变慢且泛化可能变差。本例 `1×16=16` 正好在这个范围。
+>
+> ### 一张图理解整个训练循环
+>
+> ```
+> ┌─ forward step 1 ─┐
+> │  喂 1 条样本      │ → 算梯度,累加到缓冲区
+> ├─ forward step 2 ─┤
+> │  喂 1 条样本      │ → 算梯度,继续累加
+> ├─      ...        ─┤
+> ├─ forward step 16 ─┤
+> │  喂 1 条样本      │ → 算梯度,累加完毕
+> └──────────────────┘
+>         ↓
+>   ★ optimizer step ★  ← 用累积的梯度更新参数(这才算"1步")
+>         ↓
+>   logging_steps / eval_steps / save_steps 都在数这个
+> ```
+>
+> ### 小结
+>
+> `gradient_accumulation_steps` 是**显存不够时模拟大 batch 训练的核心手段**。理解它的关键:
+> 1. 它乘以 `per_device_train_batch_size`(再乘卡数)= 等效 batch size
+> 2. 所有 `xxx_steps` 参数都按 optimizer step(参数更新次数)计数,不是按样本数
+> 3. 调大它不会增加显存,但会让每个 optimizer step 花更长时间(因为要多跑几次前向+反向)
+
 
 ## 2. 推理验证(`swift infer`)
 

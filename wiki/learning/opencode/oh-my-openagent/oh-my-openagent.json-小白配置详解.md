@@ -6,252 +6,335 @@
 
 ## 一、这个文件是什么？
 
-`oh-my-openagent.json` 是 **Oh My OpenAgent（简称 OmO）** 插件的配置文件。
-
-先搞清楚几个概念：
-
 | 概念 | 是什么 | 类比 |
 |------|--------|------|
-| **OpenCode** | 一个 AI 编程助手终端（类似 Claude Code） | 你的「终端 + AI 搭档」 |
-| **Oh My OpenAgent** | OpenCode 的插件，把它从一个 AI 变成一个 AI **团队** | 从「单人作战」变成「团队协作」 |
+| **OpenCode** | AI 编程助手终端（类似 Claude Code） | 你的「终端 + AI 搭档」 |
+| **Oh My OpenAgent** | OpenCode 插件，把它从一个 AI 变成一个 AI **团队** | 从「单人作战」变成「团队协作」 |
 | **oh-my-openagent.json** | 这个插件的配置文件 | 你给这个团队分配的「人员 + 武器」 |
 
 简单说：**有了这个插件，你不再是和一个 AI 对话，而是和一个由多个 AI 特工组成的团队协作。**
 
 ---
 
-## 二、你的配置文件长什么样？
+## 二、配置文件结构速览
 
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
-  "agents": {
-    "hephaestus":    { "model": "opencode/gpt-5-nano" },
-    "oracle":        { "model": "opencode/gpt-5-nano" },
-    "librarian":     { "model": "opencode/gpt-5-nano" },
-    "explore":       { "model": "opencode/gpt-5-nano" },
-    "multimodal-looker": { "model": "opencode/gpt-5-nano" },
-    "prometheus":    { "model": "opencode/gpt-5-nano" },
-    "metis":         { "model": "opencode/gpt-5-nano" },
-    "momus":         { "model": "opencode/gpt-5-nano" },
-    "atlas":         { "model": "opencode/gpt-5-nano" },
-    "sisyphus-junior": { "model": "opencode/gpt-5-nano" }
-  },
-  "categories": {
-    "visual-engineering": { "model": "opencode/gpt-5-nano" },
-    "ultrabrain":         { "model": "opencode/gpt-5-nano" },
-    "deep":               { "model": "opencode/gpt-5-nano" },
-    "artistry":           { "model": "opencode/gpt-5-nano" },
-    "quick":              { "model": "opencode/gpt-5-nano" },
-    "unspecified-low":    { "model": "opencode/gpt-5-nano" },
-    "unspecified-high":   { "model": "opencode/gpt-5-nano" },
-    "writing":            { "model": "opencode/gpt-5-nano" }
-  }
-}
-```
-
-当前你的配置中，所有 agent 和所有 category 都使用同一个模型：**`opencode/gpt-5-nano`**。
+| 顶层字段 | 作用 | 里面有什么 |
+|----------|------|------------|
+| `$schema` | 格式说明书链接，不用管 | 一个 URL |
+| `agents` | 定义 11 个 AI 特工各自用什么模型 | 特工名 → 模型配置 |
+| `categories` | 定义 8 种任务类型各自用什么模型 | 分类名 → 模型配置 |
 
 ---
 
-## 三、逐行解释
-
-### 3.1 `$schema`
+## 三、`$schema`
 
 ```json
 "$schema": "https://raw.githubusercontent.com/..."
 ```
 
-这一行**不需要你理解，也不需要你修改**。它告诉编辑器（如 VS Code）「这个 JSON 文件应该遵循什么格式」，这样你在编辑时会有自动补全和错误提示。可以理解为「格式说明书」的链接。
+**不需要你理解，也不需要你修改。** 它告诉编辑器（如 VS Code）「这个 JSON 文件应该遵循什么格式」，这样你在编辑时会有自动补全和错误提示。
 
 ---
 
-### 3.2 `agents` — 你的 AI 特工团队
+## 四、`agents` — 你的 11 个 AI 特工
 
-`agents` 下面定义了 **10 个特工**。每个特工有自己擅长的领域。OmO 的核心思想是：**不同的活交给不同的 AI**，而不是一个 AI 干所有事。
+OmO 的核心思想：**不同的活交给不同的 AI**，而不是一个 AI 干所有事。
 
-#### 核心特工（最重要的 3 个）
+### 4.1 特工全景表
 
-| 特工 | 名字来源 | 干什么的 | 推荐模型 |
+| 特工 | 名字来源 | 角色 | 调用频率 | 关键程度 |
+|------|----------|------|----------|----------|
+| **Sisyphus** | 西西弗斯，永不停歇 | 🔴 总指挥，理解意图、分解任务、派发子特工 | 极高 | ⭐⭐⭐ |
+| **Prometheus** | 普罗米修斯，盗火者 | 🔴 战略规划师，采访用户、制定详细计划 | 低 | ⭐⭐⭐ |
+| **Sisyphus-Junior** | Sisyphus 轻量版 | 🔴 主力执行器，实际写代码、修 bug、写测试 | 高 | ⭐⭐⭐ |
+| **Hephaestus** | 赫菲斯托斯，工匠之神 | 🟡 GPT 原生深度工作者，自主探索执行 | 低 | ⭐⭐ |
+| **Oracle** | 神谕，智者 | 🟡 只读架构顾问，提供建议不改代码 | 极低 | ⭐⭐ |
+| **Atlas** | 阿特拉斯，擎天巨神 | 🟢 执行指挥，拆计划、派任务、收结果 | 低 | ⭐ |
+| **Metis** | 墨提斯，智慧女神 | 🟢 计划漏洞分析，找遗漏和模糊点 | 极低 | ⭐ |
+| **Momus** | 摩墨斯，嘲讽之神 | 🟢 计划严格审查，按标准打分 | 极低 | ⭐ |
+| **Explore** | 探索者 | 🟢 代码库搜索（grep），找代码位置 | 高 | ⭐ |
+| **Librarian** | 图书管理员 | 🟢 文档和开源代码搜索 | 中 | ⭐ |
+| **Multimodal Looker** | 多模态观察者 | 🟢 图片/截图/PDF 分析 | 极低 | ⭐ |
+
+### 4.2 按角色分组
+
+| 分组 | 成员 | 一句话 |
+|------|------|--------|
+| 🧠 指挥层 | Sisyphus、Prometheus | 决定「做什么」 |
+| 🔨 执行层 | Sisyphus-Junior、Hephaestus | 负责「动手干」 |
+| 📋 协调层 | Atlas、Metis、Momus | 保证「干得对」 |
+| 🔍 搜索层 | Explore、Librarian | 提供「情报」 |
+| 👁️ 视觉层 | Multimodal Looker | 处理「图像」 |
+| 💬 咨询层 | Oracle | 提供「建议」 |
+
+### 4.3 每个 agent 可配置的字段
+
+| 字段 | 类型 | 作用 | 常用程度 |
+|------|------|------|----------|
+| `model` | string | 首选模型（必填） | ⭐⭐⭐ |
+| `fallback_models` | array | 首选挂了依次尝试的备用模型 | ⭐⭐⭐ |
+| `temperature` | 0~2 | 创造性：0=保守 1=自由 | ⭐ |
+| `maxTokens` | number | 单次输出最大 token 数 | ⭐ |
+| `thinking` | object | 深度思考模式开关和预算 | ⭐ |
+| `reasoningEffort` | string | 推理力度：none/minimal/low/medium/high/xhigh/max | ⭐ |
+| `disable` | boolean | 设为 true 禁用此 agent | ⭐ |
+| `permission` | object | 权限控制（编辑/命令/网络/派发） | ⭐ |
+
+---
+
+## 五、`categories` — 8 种任务分类
+
+当你让 AI 做事时，OmO 先判断任务类型，再自动选择对应模型。你不需要手动指定。
+
+### 5.1 分类全景表
+
+| 分类 | 含义 | 适合任务 | 调用频率 | 关键程度 |
+|------|------|----------|----------|----------|
+| **ultrabrain** | 高难度逻辑 | 复杂架构决策、烧脑问题 | 低 | ⭐⭐⭐ |
+| **deep** | 深度自主研究 | 需要自己探索的大任务 | 低 | ⭐⭐⭐ |
+| **visual-engineering** | 前端/UI/UX | 写界面、调样式、做动画 | 中 | ⭐⭐ |
+| **artistry** | 创造性工作 | 设计感、创意方案 | 低 | ⭐⭐ |
+| **writing** | 文档写作 | README、注释、技术文档 | 低 | ⭐ |
+| **quick** | 快速小任务 | 改拼写、修类型错误 | 高 | ⭐ |
+| **unspecified-low** | 未分类低难度 | 不重要的杂活 | 中 | ⭐ |
+| **unspecified-high** | 未分类高难度 | 没被分类但重要的事 | 低 | ⭐ |
+
+### 5.2 Agent 与 Category 的关系
+
+| 概念 | 回答的问题 | 举例 |
+|------|------------|------|
+| **Agent（特工）** | **谁**来做？ | Sisyphus-Junior |
+| **Category（分类）** | 做**什么类型**的活？决定用**什么模型** | `deep` → Claude Sonnet |
+
+当 Sisyphus 派任务时，他说「这是一个 `deep` 类型的任务」，系统自动选 `deep` 对应的模型，交给 Sisyphus-Junior 执行。
+
+---
+
+## 六、模型名称格式
+
+格式：**`提供商/模型ID`**
+
+### 6.1 CodeBuddy 可用模型速查（按价格分档）
+
+| 档次 | 模型 ID | 倍率 | 特点 |
+|------|---------|------|------|
+| 🟢 极便宜 | `deepseek-v4-flash-ioa` | 0.05x | 搜索专用，最快最省 |
+| 🟢 极便宜 | `deepseek-v4-pro-ioa` | 0.13x | 性价比之王，综合能力强 |
+| 🟢 极便宜 | `deepseek-v3-2-volc-ioa` | 0.15x | DeepSeek 上一代 |
+| 🟢 极便宜 | `gpt-5.1-codex-mini` | 0.18x | GPT 最便宜款 |
+| 🟢 极便宜 | `minimax-m2.5-ioa` | 0.13x | MiniMax 入门 |
+| 🟢 极便宜 | `minimax-m2.7-ioa` | 0.19x | MiniMax 升级 |
+| 🟢 极便宜 | `glm-4.7-ioa` | 0.23x | GLM 入门 |
+| 🟡 中等 | `kimi-k2.6-ioa` | 0.50x | 指令遵循好，Claude 平替 |
+| 🟡 中等 | `claude-haiku-4.5` | 0.67x | Claude 最便宜款 |
+| 🟡 中等 | `glm-5.0-ioa` | 0.68x | GLM 中档 |
+| 🟡 中等 | `glm-5v-turbo-ioa` | 0.81x | GLM 视觉版 |
+| 🟡 中等 | `glm-5.1-ioa` | 0.90x | GLM 旗舰，Claude-like |
+| 🟡 中等 | `gpt-5.1-codex` | 0.90x | GPT 代码专用 |
+| 🟡 中等 | `gemini-2.5-pro` | 0.90x | Gemini 上代旗舰 |
+| 🟡 中等 | `gemini-3.5-flash` | 0.99x | Gemini 快速版 |
+| 🟠 较贵 | `gpt-5.3-codex` | 1.25x | GPT 代码增强 |
+| 🟠 较贵 | `gemini-3.1-pro` | 1.32x | 前端/视觉王者 |
+| 🟠 较贵 | `gpt-5.4` | 1.65x | GPT 次旗舰 |
+| 🔴 昂贵 | `claude-sonnet-4.6` | 2.00x | 指令遵循最强之一 |
+| 🔴 昂贵 | `gpt-5.5` | 3.31x | GPT 最强 |
+| 🔴 昂贵 | `claude-opus-4.6` | 3.33x | Claude 上代旗舰 |
+| 🔴 昂贵 | `claude-opus-4.7` | 3.33x | Claude 旗舰 |
+| 🔴 昂贵 | `claude-opus-4.8` | 3.33x | Claude 最新旗舰 |
+
+> 带 `-1m` 后缀的版本（如 `claude-sonnet-4.6-1m`）上下文窗口更大（1M），价格相同。
+
+### 6.2 主要模型家族对比
+
+| 家族 | 代表模型 | 核心优势 | 适合场景 |
 |------|----------|----------|----------|
-| **Sisyphus** | 希腊神话：西西弗斯，每天推石头上山，永不停歇 | **总指挥**。制定计划、分配任务、驱动一切走向完成。他不会半途而废。 | Claude Opus / Kimi K2.6 |
-| **Hephaestus** | 希腊神话：赫菲斯托斯，火神与工匠之神 | **主力干将**。你给他一个目标（而不是一步步指令），他自主探索代码库、研究方案、端到端执行。GPT 原生，被称为「合法的工匠」。 | GPT-5.5 |
-| **Prometheus** | 希腊神话：普罗米修斯，盗火者 | **战略规划师**。动手之前先采访你，问清楚需求，识别范围，制定详细计划。 | Claude Opus / Kimi K2.6 |
-
-> ⚠️ 你的配置里没有直接配 Sisyphus（主 orchestrator），而是配了 `sisyphus-junior`（Sisyphus 的轻量版，用于执行子任务）。
-
-#### 咨询与搜索特工
-
-| 特工 | 干什么的 | 什么时候用到 |
-|------|----------|--------------|
-| **Oracle** | 只读咨询专家。架构决策、复杂调试、安全问题 | 遇到不熟悉的代码模式、多系统权衡时 |
-| **Librarian** | 文档和开源代码搜索 | 需要查最新 API 文档、找开源项目中的用法时 |
-| **Explore** | 快速代码库搜索（grep） | 想知道「X 在哪里」「哪个文件做了 Y」时 |
-| **Multimodal Looker** | 图片/截图/PDF 分析 | 需要分析设计稿、截图、图表时 |
-
-#### 审查与执行特工
-
-| 特工 | 干什么的 | 什么时候用到 |
-|------|----------|--------------|
-| **Metis** | 计划漏洞分析 | Prometheus 做完计划后，Metis 找遗漏 |
-| **Momus** | 计划严格审查 | 按清晰度、可验证性、完整性标准评审计划 |
-| **Atlas** | 执行指挥 | 把 Prometheus 的计划拆成任务，分配给子特工 |
-| **Sisyphus-Junior** | 专注任务执行器 | 执行单个明确任务，不搞复杂规划 |
-
-#### 每个 agent 可以配什么？
-
-在配置中，每个 agent 不只是配 `model`，还能配很多其他选项（这些是你的配置中没有用到的，但你可以按需添加）：
-
-```jsonc
-"oracle": {
-  "model": "openai/gpt-5.5",        // 使用什么模型（必填，最常用）
-  "fallback_models": ["kimi/k2.6"],  // 模型挂了时的备用方案
-  "temperature": 0.7,                // 创造性：0=保守 1=自由（0~2）
-  "maxTokens": 8000,                 // 单次输出最大 token 数
-  "thinking": {                      // 是否开启深度思考模式
-    "type": "enabled",
-    "budgetTokens": 4000
-  },
-  "reasoningEffort": "high",         // 推理力度：none/minimal/low/medium/high/xhigh/max
-  "disable": false,                  // 设为 true 则禁用此 agent
-  "description": "我的自定义描述",    // 覆盖 agent 的系统描述
-  "permission": {                    // 权限控制
-    "edit": "allow",                 // 编辑文件：ask(询问)/allow(允许)/deny(禁止)
-    "bash": "ask",                   // 执行命令
-    "webfetch": "allow",             // 网络请求
-    "task": "allow"                  // 派发子任务
-  }
-}
-```
+| **Claude** | sonnet-4.6, opus-4.8 | 指令遵循精准、结构化输出强 | 调度、规划、深度思考 |
+| **GPT** | gpt-5.4, gpt-5.5 | 深度推理、代码架构 | 架构设计、复杂调试 |
+| **Kimi** | kimi-k2.6 | 指令遵循接近 Claude，价格 1/4 | Claude 平替，主力执行 |
+| **DeepSeek** | v4-pro, v4-flash | 极致性价比 | 搜索、小活、辅助任务 |
+| **Gemini** | gemini-3.1-pro | 前端/视觉表现最佳 | 写 UI、看图 |
 
 ---
 
-### 3.3 `categories` — 任务分类
+## 七、实战：最终配置解析
 
-当你让 AI 做事时，OmO 首先判断你的任务属于哪一类，然后**自动选择该类对应的模型**。你不需要手动说「用 GPT 做这个」。
+以下是我们经过多轮讨论确定的配置，遵循 **「关键岗位不省钱，次要岗位省到底」** 原则。
 
-| 分类 | 含义 | 适合什么任务 | 官方推荐模型 |
-|------|------|--------------|--------------|
-| **visual-engineering** | 前端/UI/UX | 写界面、调样式、做动画 | Gemini Pro |
-| **ultrabrain** | 高难度逻辑 | 复杂架构决策、烧脑问题 | GPT-5.5 xhigh |
-| **deep** | 深度自主研究 | 需要自己探索的大任务 | GPT-5.5 |
-| **artistry** | 创造性工作 | 设计感、创意方案 | Gemini Pro |
-| **quick** | 快速小任务 | 改个拼写、修个类型错误 | GPT-5.4 Mini |
-| **unspecified-low** | 未分类低难度 | 不重要的杂活 | 最便宜的模型 |
-| **unspecified-high** | 未分类高难度 | 没被分类到但很重要的事 | Claude Opus |
-| **writing** | 文档写作 | 写 README、注释、技术文档 | Claude Opus |
-
-**关键理解**：categories 和 agents 的关系是：
-- **Agent（特工）** = 谁来做（角色）
-- **Category（分类）** = 做什么类型的活 → 决定用什么模型
-
-当 Sisyphus 派任务给子特工时，他说的是「这是一个 `deep` 类型的任务」，然后系统自动选择 `deep` 对应的模型来执行。
-
----
-
-## 四、`opencode/gpt-5-nano` 是什么意思？
-
-模型名称格式为：**`提供商/模型名`**
-
-- `opencode` = 提供商（OpenCode 平台内置的模型供应商）
-- `gpt-5-nano` = 模型名称（GPT-5 的 nano 版本，轻量快速）
-
-常见的模型名称举例：
-
-| 完整名称 | 提供商 | 模型 | 特点 |
-|----------|--------|------|------|
-| `opencode/gpt-5-nano` | OpenCode | GPT-5 Nano | 轻量、快速、便宜 |
-| `openai/gpt-5.5` | OpenAI | GPT-5.5 | 深度编码能力极强 |
-| `anthropic/claude-opus-4-7` | Anthropic | Claude Opus 4.7 | 指令遵循最好 |
-| `google/gemini-3.1-pro` | Google | Gemini 3.1 Pro | 前端/视觉任务出色 |
-| `kimi-for-coding/k2p5` | Kimi | K2.5 | Claude 的替代品，性价比高 |
-
----
-
-## 五、你的配置意味着什么？
-
-你目前的配置：**所有 agent 和所有 category 都统一用 `opencode/gpt-5-nano`**。
-
-这意味着：
-- ✅ **简单**：不需要多想，全部用同一个模型
-- ✅ **快速**：gpt-5-nano 是轻量模型，响应快
-- ❌ **没有发挥 OmO 的真正优势**：OmO 的精髓是「不同任务用不同模型」，比如前端用 Gemini、架构用 GPT-5.5、小活用便宜模型
-
-这有点像：你有一个团队，但让所有人都用同一把工具。能用，但不是最优。
-
----
-
-## 六、如果你想进阶配置
-
-### 场景一：你有多个模型供应商的 API Key
+### 7.1 完整配置
 
 ```jsonc
 {
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
+    "sisyphus": {
+      "model": "codebuddy/claude-sonnet-4.6",        // 总指挥，不省钱
+      "fallback_models": ["codebuddy/kimi-k2.6-ioa"]
+    },
+    "hephaestus": {
+      "model": "codebuddy/gpt-5.4",                  // GPT 原生，GPT 不能丢
+      "fallback_models": ["codebuddy/gpt-5.5"]
+    },
     "oracle": {
-      "model": "openai/gpt-5.5",
-      "variant": "high"  // high = 更强的推理变体
+      "model": "codebuddy/gpt-5.4",                  // 架构咨询，GPT 擅长
+      "fallback_models": ["codebuddy/claude-sonnet-4.6"]
     },
     "librarian": {
-      "model": "google/gemini-3-flash"  // 搜索用便宜的
+      "model": "codebuddy/deepseek-v4-flash-ioa",    // 文档搜索，最便宜
+      "fallback_models": ["codebuddy/deepseek-v4-pro-ioa"]
     },
     "explore": {
-      "model": "github-copilot/grok-code-fast-1"  // grep 用最快的
+      "model": "codebuddy/deepseek-v4-flash-ioa",    // 代码搜索，最便宜
+      "fallback_models": ["codebuddy/deepseek-v4-pro-ioa"]
+    },
+    "multimodal-looker": {
+      "model": "codebuddy/gemini-3.1-pro",           // 看图，Gemini 最强
+      "fallback_models": ["codebuddy/gpt-5.4"]
+    },
+    "prometheus": {
+      "model": "codebuddy/claude-sonnet-4.6",        // 规划，不省钱
+      "fallback_models": ["codebuddy/kimi-k2.6-ioa"]
+    },
+    "metis": {
+      "model": "codebuddy/deepseek-v4-pro-ioa",      // 漏洞分析，省钱
+      "fallback_models": ["codebuddy/deepseek-v4-flash-ioa"]
+    },
+    "momus": {
+      "model": "codebuddy/deepseek-v4-pro-ioa",      // 严格审查，省钱
+      "fallback_models": ["codebuddy/deepseek-v4-flash-ioa"]
+    },
+    "atlas": {
+      "model": "codebuddy/deepseek-v4-pro-ioa",      // 执行指挥，省钱
+      "fallback_models": ["codebuddy/kimi-k2.6-ioa"]
+    },
+    "sisyphus-junior": {
+      "model": "codebuddy/kimi-k2.6-ioa",            // 主力写代码，质量成本平衡
+      "fallback_models": ["codebuddy/claude-sonnet-4.6"]
     }
   },
   "categories": {
     "visual-engineering": {
-      "model": "google/gemini-3.1-pro"  // 前端交给 Gemini
+      "model": "codebuddy/deepseek-v4-pro-ioa",      // 前端，先省不行再升
+      "fallback_models": ["codebuddy/gemini-3.1-pro"]
     },
     "ultrabrain": {
-      "model": "openai/gpt-5.5",
-      "variant": "xhigh"  // 烧脑问题用最强推理
+      "model": "codebuddy/claude-sonnet-4.6",        // 深度思考，不省钱
+      "fallback_models": ["codebuddy/gpt-5.4"]
+    },
+    "deep": {
+      "model": "codebuddy/claude-sonnet-4.6",        // 深度研究，不省钱
+      "fallback_models": ["codebuddy/gpt-5.4"]
+    },
+    "artistry": {
+      "model": "codebuddy/deepseek-v4-pro-ioa",      // 设计，先省
+      "fallback_models": ["codebuddy/gemini-3.1-pro"]
     },
     "quick": {
-      "model": "openai/gpt-5.4-mini"  // 小活用便宜的
+      "model": "codebuddy/deepseek-v4-flash-ioa",    // 小活，最便宜
+      "fallback_models": ["codebuddy/deepseek-v4-pro-ioa"]
+    },
+    "unspecified-low": {
+      "model": "codebuddy/deepseek-v4-flash-ioa",    // 杂活，最便宜
+      "fallback_models": ["codebuddy/deepseek-v4-pro-ioa"]
+    },
+    "unspecified-high": {
+      "model": "codebuddy/deepseek-v4-pro-ioa",      // 重要未分类，省钱
+      "fallback_models": ["codebuddy/kimi-k2.6-ioa"]
+    },
+    "writing": {
+      "model": "codebuddy/kimi-k2.6-ioa",            // 写作，Kimi 文笔好
+      "fallback_models": ["codebuddy/deepseek-v4-pro-ioa"]
     }
   }
 }
 ```
 
-### 场景二：你只用 OpenCode 平台
+### 7.2 配置策略一览
 
-那就保持现状。`gpt-5-nano` 是一个不错的选择，够用且不复杂。
+| 层级 | 原则 | Agent / Category | 模型 | 倍率 |
+|------|------|------------------|------|------|
+| 🔴 关键 | 不省钱 | sisyphus（总指挥） | claude-sonnet-4.6 | 2.00x |
+| 🔴 关键 | 不省钱 | prometheus（规划） | claude-sonnet-4.6 | 2.00x |
+| 🔴 关键 | 不省钱 | ultrabrain（深度思考） | claude-sonnet-4.6 | 2.00x |
+| 🔴 关键 | 不省钱 | deep（深度研究） | claude-sonnet-4.6 | 2.00x |
+| 🔴 关键 | 质量成本平衡 | sisyphus-junior（主力执行） | kimi-k2.6 | 0.50x |
+| 🟡 中等 | 适度投入 | hephaestus（工匠） | gpt-5.4 | 1.65x |
+| 🟡 中等 | 适度投入 | oracle（顾问） | gpt-5.4 | 1.65x |
+| 🟢 次要 | 尽量省钱 | atlas/metis/momus | deepseek-v4-pro | 0.13x |
+| 🟢 次要 | 尽量省钱 | visual-engineering/artistry | deepseek-v4-pro | 0.13x |
+| 🟢 次要 | 尽量省钱 | writing | kimi-k2.6 | 0.50x |
+| 🟢 次要 | 尽量省钱 | explore/librarian | deepseek-v4-flash | 0.05x |
+| 🟢 次要 | 尽量省钱 | quick/unspecified-low | deepseek-v4-flash | 0.05x |
+| 🟢 次要 | 尽量省钱 | unspecified-high | deepseek-v4-pro | 0.13x |
+| 👁️ 特殊 | 看图唯一选择 | multimodal-looker | gemini-3.1-pro | 1.32x |
 
-### 场景三：你想禁用某些特工
+### 7.3 模型使用分布
+
+| 模型 | 用在哪些位置 | 倍率 | 角色 |
+|------|-------------|------|------|
+| **claude-sonnet-4.6** | sisyphus, prometheus, ultrabrain, deep | 2.00x | 质量关口，守住关键决策 |
+| **gpt-5.4** | hephaestus, oracle | 1.65x | GPT 原生场景 + 架构推理 |
+| **kimi-k2.6** | sisyphus-junior, writing | 0.50x | 主力执行 + 文档写作 |
+| **deepseek-v4-pro** | atlas, metis, momus, visual, artistry, unspec-high | 0.13x | 辅助任务批量省钱 |
+| **deepseek-v4-flash** | explore, librarian, quick, unspec-low | 0.05x | 搜索和小活极致省钱 |
+| **gemini-3.1-pro** | multimodal-looker | 1.32x | 看图专用 |
+
+### 7.4 Fallback 链设计
+
+| 位置 | 首选 → 备选 | 逻辑 |
+|------|------------|------|
+| sisyphus | sonnet → kimi | Sonnet 挂了用 Kimi，同为指令遵循好 |
+| prometheus | sonnet → kimi | 同上 |
+| hephaestus | gpt-5.4 → gpt-5.5 | GPT 升级链路，保持血统 |
+| oracle | gpt-5.4 → sonnet | GPT 挂了换 Claude |
+| sisyphus-junior | kimi → sonnet | Kimi 不够时自动升级到最强 |
+| ultrabrain/deep | sonnet → gpt-5.4 | Claude 挂了换 GPT 深度推理 |
+| visual/artistry | deepseek → gemini | 省钱优先，效果不好自动升 Gemini |
+| 其余 | deepseek 内部互备 | flash↔pro 互相兜底 |
+
+---
+
+## 八、`fallback_models` 是什么？
+
+| 场景 | 行为 |
+|------|------|
+| 首选模型正常 | 用首选，不理 fallback |
+| 首选挂了/限流/超时 | 按顺序尝试 fallback 列表里的模型 |
+| 全部不可用 | 报错，告诉你模型都不可用 |
 
 ```jsonc
-{
-  "disabled_agents": ["multimodal-looker", "mommus"],
-  "disabled_skills": ["playwright", "agent-browser"],
-  "disabled_commands": ["ralph-loop"]
+"sisyphus": {
+  "model": "codebuddy/claude-sonnet-4.6",       // ① 先试这个
+  "fallback_models": ["codebuddy/kimi-k2.6-ioa"] // ② 挂了试这个
 }
 ```
 
 ---
 
-## 七、常用术语速查表
+## 九、常用术语速查表
 
 | 术语 | 大白话解释 |
 |------|------------|
 | **Model（模型）** | AI 的大脑。不同模型擅长不同的事。 |
-| **Agent（特工）** | 一个有特定角色和职责的 AI。比如 Oracle 是架构顾问。 |
+| **Agent（特工）** | 有特定角色和职责的 AI。比如 Oracle 是架构顾问。 |
 | **Category（分类）** | 任务类型标签。系统根据分类自动选模型。 |
 | **Orchestration（编排）** | 让多个 AI 特工协作完成一个任务。 |
-| **Variant（变体）** | 同一个模型的不同「档位」，如 high/xhigh/max 控制推理深度。 |
 | **Fallback（回退）** | 首选模型不可用时的备选方案。 |
-| **Token** | AI 处理文本的最小单位。约 1 个中文字 ≈ 2 token，1 个英文单词 ≈ 1.3 token。 |
+| **Token** | AI 处理文本的最小单位。约 1 个中文字 ≈ 2 token。 |
 | **Schema** | JSON 的格式规范。告诉编辑器哪些字段合法。 |
+| **Credits（积分）** | CodeBuddy 的计费单位，不同模型消耗不同倍率。 |
 
 ---
 
-## 八、总结
+## 十、总结
 
-1. **`oh-my-openagent.json`** 是 OmO 插件的配置，定义你的 AI 团队和任务分类规则
-2. **`agents`** 是 10 个 AI 特工，各有所长
-3. **`categories`** 是 8 种任务类型，决定用什么模型
-4. 你目前全用 `opencode/gpt-5-nano`，简单够用，但没发挥多模型协作的优势
-5. 如果想进阶，可以给不同 agent/category 配不同模型
+| 要点 | 说明 |
+|------|------|
+| 文件作用 | 给 OmO 的 11 个特工和 8 种任务分配模型 |
+| 核心原则 | 关键岗位不省钱，次要岗位省到底 |
+| 质量关口 | Sisyphus/Prometheus/深度思考 → Claude Sonnet (2.00x) |
+| GPT 阵地 | Hephaestus/Oracle → GPT-5.4 (1.65x) |
+| 主力省钱 | Sisyphus-Junior → Kimi K2.6 (0.50x) |
+| 其余极致省 | 搜索/小活/辅助 → DeepSeek (0.05-0.13x) |
 
 ---
 

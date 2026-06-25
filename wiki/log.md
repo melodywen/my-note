@@ -10,6 +10,17 @@ updated: 2026-06-01
 
 ---
 
+## 2026-06-25 — wiki-retrieve | 启用本地混合检索
+
+- 从官方仓库 AgriciDaniel/claude-obsidian 稀疏检出 4 个脚本 + setup-retrieve.sh，装入 my-note/scripts/ 与 bin/
+- 纯标准库，无 pip 依赖；ollama 拉取 nomic-embed-text 供 cosine 重排
+- 以 --no-llm（tier-3 synthetic 前缀，纯本地零外发）provision：42 页 → 112 chunks，BM25 vocab 9835
+- 实测查询「Qwen 训练 微调命令 swift sft」→ top1 命中 [[03 ms-SWIFT 测试运行示例]]，strategy=bm25+rerank:cosine:nomic-embed-text ✅
+- .vault-meta/ 索引(2.4MB)与 __pycache__ 已 gitignore；脚本入库
+- 重建命令：`bash bin/setup-retrieve.sh --no-llm`
+
+---
+
 ## 2026-06-25 — wiki-lint | 全库体检 + 安全自动修复
 
 - 扫描：40 页（filesystem 传输 / DragonScale 关，地址校验+语义去重跳过）

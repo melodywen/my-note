@@ -5,3 +5,8 @@
 .trash/
 .DS_Store
 .omo/
+
+# wiki-retrieve 生成的索引/缓存（可由 bin/setup-retrieve.sh 重建，不入库）
+.vault-meta/
+__pycache__/
+*.pyc

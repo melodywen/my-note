@@ -54,6 +54,9 @@ updated: 2026-06-01
 2. [[02 ms-SWIFT 安装部署|ms-SWIFT 安装部署]]
 3. [[03 ms-SWIFT 测试运行示例|ms-SWIFT 测试运行示例]]
 
+**🗂️ Obsidian（工具）**
+1. [[Obsidian 命令与技能完全指南]] — Obsidian 命令体系 + claude-obsidian 14 个 AI 技能
+
 ### ❓ 问答/综合 (questions)
 - [[Research: 大模型微调]] — 微调研究综合页
 

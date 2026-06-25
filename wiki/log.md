@@ -10,6 +10,16 @@ updated: 2026-06-01
 
 ---
 
+## 2026-06-25 — wiki-query + autoresearch | Obsidian 命令与技能
+
+- 触发：用户要求写一篇介绍 Obsidian 所有命令与技能的文章
+- 来源：本地 claude-obsidian 14 个 SKILL.md 逐个核对 + GitHub 一手核对（仓库/作者/版本/与 kepano 关系）
+- 创建页面：[[Obsidian 命令与技能完全指南]]（归档至 learning/Obsidian/）
+- 关键内容：Obsidian 自身命令（Cmd+P 命令面板 / 核心快捷键 / Canvas / Bases）+ claude-obsidian 14 技能（wiki-query/save/ingest/autoresearch/canvas/defuddle/lint/retrieve/fold/wiki/cli/mode/markdown/bases）+ think 元技能
+- 备注：初放 questions/，按用户意见移至 learning/Obsidian/（工具学习类）
+
+---
+
 ## 2026-06-01 — autoresearch | 大模型微调
 
 - 轮次:2

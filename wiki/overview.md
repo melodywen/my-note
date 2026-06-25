@@ -26,7 +26,3 @@ updated: 2026-06-01
 ## 当前状态
 
 知识库已初始化,等待添加内容。
-
-## Canvases
-
-- [[swift-knowledge]] — iOS Swift 知识图谱

@@ -1,3 +1,19 @@
+---
+type: concept
+status: developing
+area: growth
+title: "Oh My OpenAgent 实战搭配使用指南"
+created: 2026-06-25
+updated: 2026-06-25
+tags:
+  - learning
+  - opencode
+  - oh-my-openagent
+  - 工具
+related:
+  - "[[oh-my-openagent.json-小白配置详解]]"
+---
+
 # Oh My OpenAgent 实战搭配使用指南
 
 > 上一篇文章讲了配置文件里每一项是什么。这篇讲**怎么用**——日常工作中如何搭配这些 AI 特工，什么场景走什么流程。

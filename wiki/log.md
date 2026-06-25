@@ -10,6 +10,19 @@ updated: 2026-06-01
 
 ---
 
+## 2026-06-25 — wiki-lint | 全库体检 + 安全自动修复
+
+- 扫描：40 页（filesystem 传输 / DragonScale 关，地址校验+语义去重跳过）
+- 报告：[[lint-report-2026-06-25]]
+- 真实问题 7，误报排除 12
+- 已自动修复 5：补 frontmatter×2（opencode 两页）、改死链×2（模型评测→EvalScope、微调数据集构建→07篇）、删 overview 模板遗留链（swift-knowledge）
+- 复查：frontmatter 缺失 0、真实死链仅剩 [[Qwen]]（待定是否建实体页）
+- 孤儿页 4（08/09/Qwen3数据量/opencode配置）：本库靠 index 导航，非必须处理
+- 第二轮（用户选 B，清零）：建实体页 [[Qwen]]、4 孤儿页补内链、index 加实体分区
+- 最终复查：frontmatter 缺失 0 / 真实死链 0 / 孤儿页 0 ✅ 全清
+
+---
+
 ## 2026-06-25 — wiki-query + autoresearch | Obsidian 命令与技能
 
 - 触发：用户要求写一篇介绍 Obsidian 所有命令与技能的文章

@@ -1,3 +1,19 @@
+---
+type: concept
+status: developing
+area: growth
+title: "oh-my-openagent.json 小白配置详解"
+created: 2026-06-25
+updated: 2026-06-25
+tags:
+  - learning
+  - opencode
+  - oh-my-openagent
+  - 配置
+related:
+  - "[[Oh-My-OpenAgent-实战搭配使用指南]]"
+---
+
 # oh-my-openagent.json 小白配置详解
 
 > 适用人群：刚接触 OpenCode / Oh My OpenAgent，打开配置文件一脸懵的你。

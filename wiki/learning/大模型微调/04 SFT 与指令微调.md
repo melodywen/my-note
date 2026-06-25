@@ -92,5 +92,6 @@ updated: 2026-06-01
 - [[01 大模型微调概述|大模型微调概述]]
 - [[02 全量微调与高效微调|全量微调与高效微调]]
 - [[03 LoRA 与 QLoRA|LoRA 与 QLoRA]]
+- [[09 Function Calling 与 MCP 原理详解|Function Calling 与 MCP]](指令微调进阶：让模型学会调工具)
 - [[SFT数据集构建完全指南]]
 - 综合页:[[Research: 大模型微调]]

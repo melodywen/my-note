@@ -55,13 +55,10 @@ updated: 2026-08-14
 3. [[03 ms-SWIFT 测试运行示例|ms-SWIFT 测试运行示例]]
 
 **🚀 DeepSeek Harness (dsh)**
-1. [[00 dsh 概述|dsh 概述]] — DeepSeek 开源 Agent 框架，一切皆插件
-2. [[01 dsh 是怎么运转的——从一条命令说起|dsh 是怎么运转的]] — Plugin、Bundle、Profile 和配置叠加
-3. [[02 Cordis 框架入门——五个核心概念|Cordis 框架入门]] — 插件、上下文、依赖、事件、可逆注册
-4. [[03 Agent 的一次完整对话是怎么跑的|Agent 的一次完整对话]] — Turn、Step 和工具执行流水线
-5. [[04 四种 Agent 模式有什么区别|四种 Agent 模式]] — Standard / Code / Minimal / Cordis
-6. [[05 dsh 的安全机制——沙箱、权限和审批|安全机制]] — 三层防线和 Seam 概念
-7. [[06 dsh 能干什么——实际使用场景和社区生态|使用场景和社区生态]] — 实际用途、社区插件、竞品对比
+
+- 概念篇（00–06）初稿已归档至 `learning/dsh/旧稿-仅供参考/`——随意写时期的产物，经 2026-09-14 全量核查：5/7 篇有事实错误已修订，社区生态部分无法验证仅作参考
+- 正式学习路线以 `dsh-learn` 仓库 `AGENTS.md` 为准（Cordis 实验起步，实践优先）
+- 后续实践笔记（07+）将随动手进度回到 `learning/dsh/` 补写
 
 **🗂️ Obsidian（工具）**
 1. [[Obsidian 命令与技能完全指南]] — Obsidian 命令体系 + claude-obsidian 14 个 AI 技能

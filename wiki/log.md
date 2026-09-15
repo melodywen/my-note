@@ -1,12 +1,24 @@
 ---
 type: meta
 title: "Log"
-updated: 2026-06-01
+updated: 2026-09-14
 ---
 
 # 操作日志 (Log)
 
 仅追加。新条目放在最上方。永不修改历史条目。
+
+---
+
+## 2026-09-14 — dsh | 概念篇旧稿全量核查、修订与归档
+
+- 对照官方文档（architecture / cordis-primer / agent-presets README / profile-boot.ts 等源码注释）逐篇核查 00–06
+- 确凿错误已修：02 事件分发四种→五种（补 bail）；01 Bundle 三个→六个（补 sdk-app/acp-app/sdk-minimal）+ 配置叠加补 home 级层；04 preset 切换规则（仅新建会话可选、三来源表、code→ptc）；05 fail-closed 引文更正为官方测试用例名；00 stars 223k+、tui 示例、路线表
+- 03/05 主体与官方时序图逐项吻合，无改动（仅 05 引文更正）
+- 判定：随意写时期旧稿，不符合当前进度规范 → 整组移入 `learning/dsh/旧稿-仅供参考/`，正式路线以 dsh-learn 仓库 AGENTS.md 为准
+- 4 张课程截图重命名为语义化文件名并挂接（arch-overview / car-metaphor → 00；four-objects / agent-assembly → 01），look_at 评估均为 dsh 特定或高价值通用概念图
+- index.md dsh 段落改为状态说明；已提交 my-note@feature/dev `218a4cf`（未推送）
+- 遗留：dsh-learn 仓库 7dafdfc 夹带 README 改动，已在 AGENTS.md 补记教训（暂存前必须逐文件核对 git status）；dark.txt / light.txt 为无关临时文件保持未跟踪
 
 ---
 

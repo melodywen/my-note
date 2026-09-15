@@ -4,7 +4,7 @@ status: developing
 area: growth
 tags: [learning, dsh, DeepSeek, cordis, 入门]
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-09-14
 ---
 
 # 01 dsh 是怎么运转的——从一条命令说起
@@ -32,11 +32,14 @@ dsh 的整个设计可以用一个比喻来理解：**搭积木**。
 - 不同积木搭出来的东西 = 一个 **Profile**
 - 一袋配套的积木 = 一个 **Bundle**
 
-dsh 官方给了你两袋配套积木：
+dsh 官方提供了多袋配套积木（截至 2026-09 共六个，见下一节表格），搭 Web Profile 最核心的两袋是：
 - **dsh-base**：基础积木袋，里面有约 70 块积木（LLM 调用、会话管理、文件系统、Bash 执行、沙箱安全……）
 - **dsh-web-app**：Web 积木袋，在基础之上加上 Web 服务器和前端 UI 组件
 
 你搭出来的 Web Profile = 先把 dsh-base 的积木全部摆上，再把 dsh-web-app 的积木叠上去（有些会替换掉 base 的同名积木），最后加上你自己的修改。
+
+![[course-cordis-profile-bundle-patch.png]]
+> 课程讲义：Cordis / Profile / Bundle / Patch 四个核心对象（依据官方仓库提交 `47f9438`，极客时间课程视频截图，2026-09-11）
 
 ## 什么是 Plugin（插件）
 
@@ -68,13 +71,18 @@ Bundle 是**一组配套插件的分发格式**。它不是一个技术概念，
 1. 一堆插件代码（npm 依赖）
 2. 一个 `cordis.patch.yml` 文件（声明要加载哪些插件、每个插件的配置）
 
-dsh 目前有三个 Bundle：
+dsh 目前有六个 Bundle（截至 2026-09，官方 architecture.md）：
 
 | Bundle | 作用 | 对应的积木袋 |
 |---|---|---|
-| `dsh-base` | 基础能力：LLM、工具、会话、沙箱、凭据 | "基础袋"——每个 Profile 都必须用 |
+| `dsh-base` | 基础能力：LLM、工具、会话、沙箱、凭据 | "基础袋"——web / headless / sdk / acp 四个 profile 的共享第一层 |
 | `dsh-web-app` | Web UI：服务器、前端 React 组件 | "Web 袋"——叠在 base 之上 |
-| `dsh-headless` | 无界面运行器 | "Headless 袋"——替代 Web 袋 |
+| `dsh-headless` | 无服务器的一次性运行器 | "Headless 袋"——替代 Web 袋 |
+| `dsh-sdk-app` | SDK JSON-RPC 服务器 | 供 TypeScript / Python SDK 嵌入 |
+| `dsh-acp-app` | 面向自动化的 ACP 服务器 | 编辑器集成等自动化场景 |
+| `dsh-sdk-minimal` | 刻意保留的例外：完整显式配置树，**不叠 dsh-base** | 独立"极简袋" |
+
+> 随发行版交付的 profile 模板共五个：`web` / `headless` / `sdk` / `sdk-minimal` / `acp`（没有 `tui`）。
 
 ## 什么是 Profile（配置组合）
 
@@ -110,6 +118,9 @@ Profile 是**你最终搭出来的东西**。它决定用哪些 Bundle、怎么�
 
 这是 dsh 最精妙的设计：**配置不是写死的，是多层叠出来的**。
 
+![[course-agent-assembly.png]]
+> 一切皆插件：Profile / Bundles 经 cordis.patch.yml 叠加进 Cordis Context，组装出 Running Agent（极客时间课程视频截图，2026-09-11）
+
 想象你在画一幅画：
 
 ```
@@ -119,9 +130,11 @@ Profile 是**你最终搭出来的东西**。它决定用哪些 Bundle、怎么�
     ↓
 第 3 层：dsh-web-app 的积木叠上去（替换一些、新增一些）
     ↓
-第 4 层：你的修改（cordis.patch.yml）
+第 4 层：你的修改（~/.dsh/profiles/web/cordis.patch.yml）
     ↓
-第 5 层：命令行临时参数（--patch）
+第 5 层：home 级修改（~/.dsh/cordis.patch.yml，对所有 profile 生效）
+    ↓
+第 6 层：命令行临时参数（--patch）
 ```
 
 **后画的覆盖先画的**。如果第 3 层和第 2 层都有同一个插件，第 3 层的配置生效。

@@ -4,7 +4,7 @@ status: developing
 area: growth
 tags: [learning, dsh, DeepSeek, agent-harness, cordis]
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-09-14
 ---
 
 # DeepSeek Harness (dsh) 概述
@@ -16,13 +16,16 @@ DeepSeek Harness（`dsh`）是 [DeepSeek AI](https://deepseek.com) 开源的 **A
 > [!info] 项目信息
 > - **仓库**: https://github.com/deepseek-ai/deepseek-harness
 > - **官网**: https://deepseek.com/harness
-> - **Stars**: 75.6k+（截至 2026-08）
+> - **Stars**: 223k+（截至 2026-09）
 > - **状态**: Developer Preview（迭代中，会有 Breaking Changes）
 > - **License**: MIT
 
 ## 为什么叫 "Harness"
 
 "Harness" 原意是"马具 / 线束"，在 AI 领域指的是把大模型"套上"一套工具、记忆、规划等外围能力，让它从"只会聊天"变成"能做事"的 Agent。`dsh` 就是 DeepSeek 提供的这套"马具"。
+
+![[course-harness-car-metaphor.png]]
+> Harness Engineering：模型是引擎，Harness 是把动力变成行动的整套工作系统（极客时间课程视频截图，2026-09-11）
 
 ## 核心特性
 
@@ -45,6 +48,9 @@ npx @deepseek-ai/dsh web
 
 一行命令启动 Web UI，默认在 `http://127.0.0.1:3080` 提供服务。
 
+![[course-arch-overview.png]]
+> dsh 五层架构总览：Cordis Context 作为总线贯穿交互入口 / Agent 核心 / 智能能力 / 执行与治理 / 数据与观测（极客时间课程视频截图，2026-09-11）
+
 ## 命令行用法
 
 ```bash
@@ -53,8 +59,8 @@ dsh [options] [command] [args...]
 # 常用命令
 dsh web                              # 启动 Web Profile（等同于 --profile web）
 dsh --profile headless "run tests"  # 无头模式：执行单个任务后退出
-dsh --profile tui --patch ./extra.yml  # 自定义 Profile + 额外覆盖层
-dsh plugin --profile tui add <pkg>   # 为 Profile 安装插件
+dsh --profile myagent --patch ./extra.yml  # 自定义 Profile + 额外覆盖层
+dsh plugin --profile myagent add <pkg>   # 为 Profile 安装插件
 
 # 调试命令
 dsh --dump-config                    # 打印合成后的 Profile 配置树
@@ -230,7 +236,7 @@ npx @deepseek-ai/dsh web
 
 **配置叠加顺序**（后者覆盖前者）：
 ```
-dsh-base bundle → dsh-web-app bundle → cordis.patch.yml → --patch 参数
+bundles（按 package.json 声明顺序）→ profile 的 cordis.patch.yml → home 级 ~/.dsh/cordis.patch.yml（对所有 profile 生效）→ --patch 参数
 ```
 
 #### `pnpm-workspace.yaml` — pnpm workspace 配置
@@ -352,13 +358,16 @@ dsh 的权限分两个层面，由 `DSH_PERMISSION_MODE` 环境变量控制：
 以下是我学习 `dsh` 的计划路线：
 
 - [x] 00 — dsh 概述（本页）
-- [ ] 01 — 项目架构与 monorepo 结构分析
-- [ ] 02 — Cordis 框架核心概念
-- [ ] 03 — 插件系统设计原理
-- [ ] 04 — 核心包源码阅读
-- [ ] 05 — Web UI 架构分析
-- [ ] 06 — 编写自定义插件
-- [ ] 07 — 实战：用 dsh 构建 Agent
+- [x] 01 — dsh 是怎么运转的（Plugin / Bundle / Profile / Patch）
+- [x] 02 — Cordis 框架入门（五个核心概念）
+- [x] 03 — Agent 的一次完整对话（Round / Turn / Step）
+- [x] 04 — 四种 Agent 模式
+- [x] 05 — 安全机制（沙箱 / 权限 / 审批）
+- [x] 06 — 使用场景和社区生态
+- [ ] 07+ — 动手实践篇：代码进 `dsh-learn` 仓库，路线见其 `AGENTS.md`（阶段一 Cordis 实验 → 阶段二 插件开发 → 阶段三 能力扩展 → 深水区）
+
+> [!note] 2026-09-14 更新
+> 概念篇 00–06 已完成。本页初稿时拟的路线（源码阅读 / Web UI 架构分析等）已并入 `dsh-learn` 仓库 `AGENTS.md` 的正式学习路线图，以那份为准。
 
 ## 相关链接
 

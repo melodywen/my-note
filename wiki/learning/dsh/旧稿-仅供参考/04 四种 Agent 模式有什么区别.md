@@ -4,7 +4,7 @@ status: developing
 area: growth
 tags: [learning, dsh, DeepSeek, agent-preset, 模式]
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-09-14
 ---
 
 # 04 四种 Agent 模式有什么区别
@@ -16,7 +16,7 @@ dsh 内置了四种 Agent 模式（官方叫 **Agent Preset**，即 Agent 预设
 | 模式 | 中文名 | 一句话 | 工具数 |
 |---|---|---|---|
 | **standard** | 标准模式 | 全功能编码 Agent | ~20 |
-| **code** | PTC 模式 | 标准 + 用 TypeScript 程序批量调工具 | ~21 |
+| **ptc** | PTC 模式 | 标准 + 用 TypeScript 程序批量调工具 | ~21 |
 | **minimal** | 极简模式 | 只有 Bash + 文件编辑器 | 2 |
 | **cordis** | 创造模式 | 标准 + 能检查和修改自己的运行时 | ~22 |
 
@@ -56,7 +56,7 @@ dsh 内置了四种 Agent 模式（官方叫 **Agent Preset**，即 Agent 预设
 
 日常写代码用这个就够了。
 
-### PTC 模式（Code Mode）
+### PTC 模式（Code Mode，preset id：`ptc`）
 
 PTC = Programmatic Tool Calling。在标准模式的基础上，多了一个 `tool-presentation` 插件。
 
@@ -143,9 +143,20 @@ PTC 模式：
 
 ## 怎么切换模式
 
-在 Web UI 里，新建会话时可以选择 Agent 模式。也可以在已有会话中通过设置切换。
+**只在新建会话时选**。Web UI 的新建会话界面有 preset 选择 chip；会话一旦开跑 preset 就固定了——会话历史是在那套工具和人设下产生的，宿主拒绝中途更换（源码注释原话：*"A running session keeps the composition it began with (the host refuses to adopt an existing session under a different preset)."*，见 `packages/client/ui-agent-preset/src/client/index.ts`）。所以会话头部只有只读标签，没有切换控件。
 
-每个模式对应一个配置文件，位于 dsh 的 `config/agent-presets/` 目录下。如果你想自定义模式，可以复制一个 preset 目录然后修改。
+可选的 preset 来自三个来源（`dsh-agent-presets` 插件 README）：
+
+| 来源 | 位置 |
+|---|---|
+| 随包交付 | 打包在 `dsh-agent-presets` 包内 `presets/`（仓库路径 `packages/preset/agent-presets/presets/`） |
+| 部署配置的根目录 | 插件 `roots` 配置项指定的扫描目录 |
+| 用户自建 | `~/.dsh/.agent-presets/`（`<dshHome>/.agent-presets`） |
+
+自定义模式 = 复制一个现有 preset 目录到用户根下再改（Web UI 设置页有复制入口）。
+
+> [!note] 2026-09-14 更正
+> 初稿写的"已有会话中可通过设置切换"与"配置文件在 `config/agent-presets/`"均不对，已按源码更正。
 
 ## 小结
 
@@ -161,6 +172,7 @@ PTC 模式：
 - Agent Preset 的概念来自 [architecture.md](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/architecture.md) 的 "Where new behavior goes" 表格
 - "两个平面"的概念来自 `agent-presets/cordis/` 配置文件中的注释
 - 四种模式的描述来自 [deepseek.com/harness](https://deepseek.com/harness/en/) 官网
+- 切换规则与 preset 三个来源来自 `packages/preset/agent-presets/README.zh.md` 与 `packages/client/ui-agent-preset/` 源码注释（2026-09-14 核对）
 
 ## 下一篇
 

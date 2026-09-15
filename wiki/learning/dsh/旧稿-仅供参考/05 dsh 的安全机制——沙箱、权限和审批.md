@@ -4,7 +4,7 @@ status: developing
 area: growth
 tags: [learning, dsh, DeepSeek, 安全, 沙箱, 权限]
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-09-14
 ---
 
 # 05 dsh 的安全机制——沙箱、权限和审批
@@ -75,7 +75,7 @@ Web UI 弹窗: "Agent 想执行: npm install，允许吗？"
 
 如果没人回答（比如 Headless 模式），默认**拒绝**（fail closed）。
 
-> 官方文档说：*"absence fails closed to unavailable"*——没有回答方时以不可用关闭。
+> 官方 user-approval 插件的测试用例名就叫 *"fails closed to unavailable when nobody listens"*——没有任何监听方应答时，请求以"不可用"收场，绝不放行。（见 `packages/interaction/user-approval/tests/approval.spec.ts`）
 
 ## 工具执行流水线中的安全检查
 

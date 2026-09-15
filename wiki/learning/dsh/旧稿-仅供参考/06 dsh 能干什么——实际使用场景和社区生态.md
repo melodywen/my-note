@@ -4,7 +4,7 @@ status: developing
 area: growth
 tags: [learning, dsh, DeepSeek, 使用场景, 社区, 生态]
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-09-14
 ---
 
 # 06 dsh 能干什么——实际使用场景和社区生态
@@ -67,6 +67,9 @@ dsh plugin --profile myagent add some-plugin
 dsh --profile myagent
 ```
 
+> [!warning] ⚠️ 未验证
+> `dsh plugin --profile myagent add` 的子命令顺序我还没实际跑过，语法待验证，用前先看 `dsh plugin --help`。
+
 ## 社区已经做出来的东西
 
 ### 插件
@@ -107,6 +110,9 @@ Cordis 的核心特性——插件加载时注册的所有东西（事件监听�
 
 ## 和竞品对比
 
+> [!warning] 时效提示（2026-09-14）
+> 下表是 2026-08 初稿时的对比印象，部分条目已过时——例如 Claude Code 现已支持子 Agent（subagents）与 MCP 等扩展机制，表中"子 Agent 无 / 插件架构无"的说法不再成立。此表仅作当时视角存档，引用前请自行核实各家现状。
+
 | 维度 | dsh | Claude Code | Cursor |
 |---|---|---|---|
 | **模型** | DeepSeek（可接其他） | Claude | 多模型 |
@@ -132,8 +138,10 @@ Cordis 的核心特性——插件加载时注册的所有东西（事件监听�
 - [x] 04 — 四种 Agent 模式有什么区别
 - [x] 05 — dsh 的安全机制——沙箱、权限和审批
 - [x] 06 — dsh 能干什么——实际使用场景和社区生态（本页）
-- [ ] 07 — 编写自定义插件
-- [ ] 08 — 实战：用 dsh 构建 Agent
+- [x] 07+ — 动手实践篇：转入 `dsh-learn` 仓库，学习路线见其 `AGENTS.md`（Cordis 实验 → 插件开发 → 能力扩展 → 深水区）
+
+> [!note] 2026-09-14 更新
+> 概念篇 00–06 完结。原计划的 07（编写自定义插件）、08（实战构建 Agent）并入 `dsh-learn` 仓库的 `AGENTS.md` 学习路线，后续笔记随实践写在那里。
 
 ## 相关链接
 

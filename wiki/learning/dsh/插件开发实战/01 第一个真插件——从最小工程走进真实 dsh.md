@@ -14,7 +14,7 @@ updated: 2026-09-16
 > - 源码：`~/ai-work/dsh/deepseek-harness/`（master `0d1f50007f`）
 > - 前置：已完成**阶段一**（cordis-tutorial 七讲，实验02–07）
 > - **本文是阶段二的起点**：从"临时最小工程跑 Cordis"升级到"把插件装进真实 dsh"
-> - 与官方的差异：官方用 `deepseek-harness/scratch-plugin/` + `pnpm dsh web`；**本文改在 `dsh-learn/plugins/` + `dsh-learn/start.sh`**（遵守 AGENTS.md，不污染官方仓库）
+> - 与官方的差异：官方用 `deepseek-harness/scratch-plugin/` + `pnpm dsh web`；**本文改在 `dsh-learn/example/plugins/` + `dsh-learn/start.sh`**（遵守 AGENTS.md，不污染官方仓库）
 
 ## 阶段二在学什么
 
@@ -24,7 +24,7 @@ updated: 2026-09-16
 
 | | 阶段一（七讲） | 阶段二（develop 教程） |
 |---|---|---|
-| 工程 | `test_workspace/cordis-tutorial/lesson-*`（自包含最小工程） | `dsh-learn/plugins/*`（真实 dsh 插件） |
+| 工程 | `test_workspace/cordis-tutorial/lesson-*`（自包含最小工程） | `dsh-learn/example/plugins/*`（真实 dsh 插件） |
 | 启动 | `npm start`（自己的 `bin.js`） | `./start.sh`（启动真实 dsh） |
 | 挂载 | `cordis.yml` 顶层列表 | `cordis.patch.yml` 的 `insert:` 覆盖层 |
 | 目标 | 理解**模式** | 写出**能用的插件** |
@@ -68,7 +68,7 @@ dsh 插件用 **patch 覆盖层**：
       name: '/绝对路径/plugins/hello-plugin/hello-plugin.ts'
 ```
 
-> **出处**：`plugins/codebuddy-llm/cordis.patch.yml`（本仓库现有插件）+ 官方 `develop/basic/index.zh.md`——*"插件路径必须是绝对路径。patch 文件只贡献配置，不会改变 loader 解析模块路径时使用的 profile 目录。"*
+> **出处**：`example/plugins/codebuddy-llm/cordis.patch.yml`（本仓库现有插件）+ 官方 `develop/basic/index.zh.md`——*"插件路径必须是绝对路径。patch 文件只贡献配置，不会改变 loader 解析模块路径时使用的 profile 目录。"*
 
 **为什么是 `insert` 而不是顶层列表**：dsh 的 profile 已有大量内置插件（base 层），你的 patch 是**在它之上再叠一层**（AGENTS.md 说的"配置五层叠加"里的**用户层**）。`insert` = 插入，不改动已有配置。
 
@@ -78,12 +78,12 @@ dsh 插件用 **patch 覆盖层**：
 
 官方教程让你 `pnpm dsh web --patch ./scratch-plugin/cordis.yml`；本仓库封装成 `start.sh`：
 
-> **出处**：`dsh-learn/start.sh`——*"启动 dsh 时，一律优先使用本仓库根目录的 `./start.sh`……已自动把本仓库的 `plugins/codebuddy-llm/cordis.patch.yml` 作为 `--patch` 层挂上。"*
+> **出处**：`dsh-learn/start.sh`——*"启动 dsh 时，一律优先使用本仓库根目录的 `./start.sh`……已自动把本仓库的 `example/plugins/codebuddy-llm/cordis.patch.yml` 作为 `--patch` 层挂上。"*
 
 它默认挂 `codebuddy-llm` 那一层，并支持**再叠一层**：
 
 ```sh
-./start.sh --patch plugins/hello-plugin/cordis.patch.yml
+./start.sh --patch example/plugins/hello-plugin/cordis.patch.yml
 ```
 
 > **出处**：`start.sh` 头部注释——*"`./start.sh --patch extra.yml` —— 额外再叠一层 patch"*
@@ -116,12 +116,12 @@ dsh 插件用 **patch 覆盖层**：
 
 ```sh
 cd ~/ai-work/dsh/dsh-learn
-mkdir -p plugins/hello-plugin
+mkdir -p example/plugins/hello-plugin
 ```
 
 ### 第 2 步：写插件本体 `hello-plugin.ts`（**你敲**）
 
-创建 `plugins/hello-plugin/hello-plugin.ts`：
+创建 `example/plugins/hello-plugin/hello-plugin.ts`：
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -137,7 +137,7 @@ export function apply(ctx: Context) {
 
 ### 第 3 步：写挂载层 `cordis.patch.yml`（**你敲**）
 
-创建 `plugins/hello-plugin/cordis.patch.yml`：
+创建 `example/plugins/hello-plugin/cordis.patch.yml`：
 
 ```yaml
 # hello-plugin 挂载层
@@ -145,15 +145,15 @@ export function apply(ctx: Context) {
 # （`name` 必须是插件文件的绝对路径——patch 只贡献配置，不改 loader 的解析目录）
 - insert:
     - id: hello-plugin
-      name: '/Users/melodycchen/ai-work/dsh/dsh-learn/plugins/hello-plugin/hello-plugin.ts'
+      name: '/Users/melodycchen/ai-work/dsh/dsh-learn/example/plugins/hello-plugin/hello-plugin.ts'
 ```
 
-> **出处**：结构照搬 `plugins/codebuddy-llm/cordis.patch.yml`（本仓库现有插件）；`name` 需绝对路径见官方 `develop/basic/index.zh.md`
+> **出处**：结构照搬 `example/plugins/codebuddy-llm/cordis.patch.yml`（本仓库现有插件）；`name` 需绝对路径见官方 `develop/basic/index.zh.md`
 > ⚠️ **路径按你自己的实际路径改**（用 `pwd` 确认）
 
 ### 第 4 步：（建议）写 `package.json`
 
-创建 `plugins/hello-plugin/package.json`：
+创建 `example/plugins/hello-plugin/package.json`：
 
 ```json
 {
@@ -165,12 +165,12 @@ export function apply(ctx: Context) {
 }
 ```
 
-> **出处**：结构照搬 `plugins/codebuddy-llm/package.json`
+> **出处**：结构照搬 `example/plugins/codebuddy-llm/package.json`
 
 ### 第 5 步：干跑验证命令（不真正启动）
 
 ```sh
-DRY_RUN=1 ./start.sh --patch plugins/hello-plugin/cordis.patch.yml
+DRY_RUN=1 ./start.sh --patch example/plugins/hello-plugin/cordis.patch.yml
 ```
 
 会打印完整命令，确认 `--patch` 挂了两层（codebuddy + hello-plugin）。
@@ -180,7 +180,7 @@ DRY_RUN=1 ./start.sh --patch plugins/hello-plugin/cordis.patch.yml
 ### 第 6 步：启动 dsh
 
 ```sh
-./start.sh --patch plugins/hello-plugin/cordis.patch.yml
+./start.sh --patch example/plugins/hello-plugin/cordis.patch.yml
 ```
 
 启动过程中，终端应打印：
@@ -209,7 +209,7 @@ DRY_RUN=1 ./start.sh --patch plugins/hello-plugin/cordis.patch.yml
 [hello-plugin] plugin loaded!
 ```
 
-> **出处**：本人实测（`dsh-learn/plugins/hello-plugin/`，`./start.sh --patch <绝对路径>`，2026-09-16）——`[hello-plugin] plugin loaded!` 成功打印
+> **出处**：本人实测（`dsh-learn/example/plugins/hello-plugin/`，`./start.sh --patch <绝对路径>`，2026-09-16）——`[hello-plugin] plugin loaded!` 成功打印
 
 > [!note] 启动命令用绝对路径更稳
 > 实测用**绝对路径**传 `--patch`（`./start.sh --patch /Users/.../hello-plugin/cordis.patch.yml`）；`start.sh` 也支持相对路径，但绝对路径可避免"当前工作目录"影响，更稳。
@@ -230,7 +230,7 @@ DRY_RUN=1 ./start.sh --patch plugins/hello-plugin/cordis.patch.yml
 | 自动清理 | `ctx.effect`                      | **一样**                         |
 | 挂载配置 | `cordis.yml` 顶层列表                 | `cordis.patch.yml` 的 `insert:` |
 | 启动器  | `npm start`                       | `./start.sh`                   |
-| 工程位置 | `test_workspace/cordis-tutorial/` | `dsh-learn/plugins/`           |
+| 工程位置 | `test_workspace/cordis-tutorial/` | `dsh-learn/example/plugins/`           |
 
 **结论**：**核心模式没变，变的是环境与挂载方式。** 七讲打的地基直接复用。
 

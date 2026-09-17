@@ -286,7 +286,7 @@ effect cleaned up
 
 **目标**：把 05 篇的抽象概念（6 态状态机、自动清理、dispose）变成**终端里看得见的输出**。
 
-案例插件在 `dsh-learn/plugins/lifecycle-demo/`，做三件事：
+案例插件在 `dsh-learn/example/plugins/lifecycle-demo/`，做三件事：
 1. **① 打印完整生命周期**：`apply` 执行（LOADING→ACTIVE）+ effect 注册/清理
 2. **② 验证"逆序开始 + 异步并发"**：两个异步清理 effect（A 耗时 300ms、B 耗时 100ms）
 3. **③ 观察 Fiber 状态 + dispose 演示**：挂子插件、读 `fiber.state`、手动 `dispose`
@@ -354,7 +354,7 @@ export function apply(ctx: Context) {
 ```sh
 # 1) 解依赖（插件按绝对路径加载，解析不到 @deepseek-ai 包）
 GLOBAL_DSH=~/.nvm/versions/node/v24.14.0/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai
-cd ~/ai-work/dsh/dsh-learn/plugins/lifecycle-demo
+cd ~/ai-work/dsh/dsh-learn/example/plugins/lifecycle-demo
 mkdir -p node_modules/@deepseek-ai
 for p in dsh-tools dsh-llm dsh-brand cordis schemastery cosmokit dsh-agent \
          dsh-scope dsh-session dsh-invariants dsh-code-runtime \
@@ -365,7 +365,7 @@ done
 # 2) 清端口 + 执行
 pkill -9 -f "@deepseek-ai/dsh" 2>/dev/null; sleep 2
 cd ~/ai-work/dsh/dsh-learn
-./start.sh --patch /Users/melodycchen/ai-work/dsh/dsh-learn/plugins/lifecycle-demo/cordis.patch.yml
+./start.sh --patch /Users/melodycchen/ai-work/dsh/dsh-learn/example/plugins/lifecycle-demo/cordis.patch.yml
 ```
 
 ### ✅ 实测输出（2026-09-16）

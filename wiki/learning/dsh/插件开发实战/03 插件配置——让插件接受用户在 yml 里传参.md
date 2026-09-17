@@ -13,7 +13,7 @@ updated: 2026-09-16
 > - 对应官方：`docs/user/develop/basic/config.zh.md`（插件配置）
 > - 源码：`~/ai-work/dsh/deepseek-harness/`（master `0d1f50007f`）
 > - 前置：完成 [01 第一个真插件](01%20第一个真插件——从最小工程走进真实%20dsh.md)、[02 开发一个工具](02%20开发一个工具——把能力暴露给模型.md)；回顾**实验05**《配置》
-> - 与官方差异：在 `dsh-learn/plugins/` 走 `start.sh`（同 01/02 篇）
+> - 与官方差异：在 `dsh-learn/example/plugins/` 走 `start.sh`（同 01/02 篇）
 
 ## 这个实验要验证什么
 
@@ -113,12 +113,12 @@ export const Config = Schema.object({
 
 ```sh
 cd ~/ai-work/dsh/dsh-learn
-mkdir -p plugins/greet-config
+mkdir -p example/plugins/greet-config
 ```
 
 ### 第 2 步：写插件本体 `greet-config.ts`
 
-创建 `plugins/greet-config/greet-config.ts`（在 02 篇基础上加 `Config` + 用 `config.greeting`）：
+创建 `example/plugins/greet-config/greet-config.ts`（在 02 篇基础上加 `Config` + 用 `config.greeting`）：
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -162,12 +162,12 @@ export function apply(ctx: Context, config: Config) {
 
 ### 第 3 步：写挂载层（**带 `config:` 块**）
 
-创建 `plugins/greet-config/cordis.patch.yml`：
+创建 `example/plugins/greet-config/cordis.patch.yml`：
 
 ```yaml
 - insert:
     - id: greet-config
-      name: '/Users/melodycchen/ai-work/dsh/dsh-learn/plugins/greet-config/greet-config.ts'
+      name: '/Users/melodycchen/ai-work/dsh/dsh-learn/example/plugins/greet-config/greet-config.ts'
       config:
         greeting: '你好'
 ```
@@ -178,7 +178,7 @@ export function apply(ctx: Context, config: Config) {
 
 ```sh
 GLOBAL_DSH=~/.nvm/versions/node/v24.14.0/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai
-cd ~/ai-work/dsh/dsh-learn/plugins/greet-config
+cd ~/ai-work/dsh/dsh-learn/example/plugins/greet-config
 mkdir -p node_modules/@deepseek-ai
 for p in dsh-tools dsh-llm dsh-brand cordis schemastery cosmokit dsh-agent \
          dsh-scope dsh-session dsh-invariants dsh-code-runtime \
@@ -193,7 +193,7 @@ done
 
 ```sh
 cd ~/ai-work/dsh/dsh-learn
-./start.sh --patch /Users/melodycchen/ai-work/dsh/dsh-learn/plugins/greet-config/cordis.patch.yml
+./start.sh --patch /Users/melodycchen/ai-work/dsh/dsh-learn/example/plugins/greet-config/cordis.patch.yml
 ```
 
 **实测输出**（2026-09-16）：
@@ -214,7 +214,7 @@ dsh web: http://127.0.0.1:3080/?token=...
 ```yaml
 - insert:
     - id: greet-config
-      name: '/Users/melodycchen/ai-work/dsh/dsh-learn/plugins/greet-config/greet-config.ts'
+      name: '/Users/melodycchen/ai-work/dsh/dsh-learn/example/plugins/greet-config/greet-config.ts'
 ```
 
 **实测输出**（2026-09-16）：

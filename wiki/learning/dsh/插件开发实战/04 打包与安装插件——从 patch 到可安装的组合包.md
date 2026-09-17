@@ -172,7 +172,7 @@ export function apply() {
 ### 第 2 步：安装进 demo profile
 
 ```sh
-cd ~/ai-work/dsh/dsh-learn/plugins/publish-demo
+cd ~/ai-work/dsh/dsh-learn/example/plugins/publish-demo
 dsh plugin --profile demo add ./hello-bundle
 ```
 

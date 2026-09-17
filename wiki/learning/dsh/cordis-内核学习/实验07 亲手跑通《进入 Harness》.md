@@ -190,7 +190,7 @@ export function apply(ctx: Context) {
 }
 ```
 
-> [!warning] ⚠️ 版本差异：`brandString` / `ToolCallId` 在 npm 版不可用
+> [!warning] ⚠️ 版本差异：`brandString` / `ToolCallId` 的可用性**随版本变化**（重要教训）
 > 官方示例写：
 > ```ts
 > import { brandString } from '@deepseek-ai/dsh-brand'
@@ -198,14 +198,20 @@ export function apply(ctx: Context) {
 > // ...
 > callId: brandString<ToolCallId>('demo-1'),
 > ```
-> 但**实测 npm 版两个符号都用不了**：
-> - `@deepseek-ai/dsh-brand@0.0.1-rc.1` **运行时不导出任何东西**（`Object.keys` 为空）——它只是**纯类型包**，提供 `Branded<B>` 类型（`dsh-brand/lib/types/index.d.ts` 注释：*"a type-only utility (no runtime code)"*）。
-> - 直接 import `brandString` 会报：`SyntaxError: The requested module '@deepseek-ai/dsh-brand' does not provide an export named 'brandString'`
 >
-> **正确用法**（npm 版）：由 `dsh-llm` 导出工厂函数 `CallId`：
-> > **出处**：`dsh-llm/lib/types/brand.d.ts:31`——`export declare function CallId(id: string): CallId`
-> 且 `ToolCallId` 在 npm 版叫 **`CallId`**（`brand.d.ts:25`：`export type CallId = Branded<'CallId'>`）。
-> **出处**：本人实测（2026-09-16）
+> **🕐 当时（2026-09-16，`dsh-brand@0.0.1-rc.1`）——官方写法不可用**：
+> - `dsh-brand@0.0.1-rc.1` **运行时不导出任何东西**（纯类型包）
+> - 直接 import `brandString` 报：`SyntaxError: ... does not provide an export named 'brandString'`
+> - 当时的变通：用 `dsh-llm` 的 `CallId` 工厂 → `CallId('demo-1')`
+>
+> **✅ 现在（2026-09-16 复核，`dsh-brand@0.1.5-rc.2`）——官方写法已可用**：
+> - `dsh-brand` 的 `lib/index.js` **已有 `function brandString(value)` 运行时实现**（`lib/types/index.d.ts` 也 `export declare function brandString`）
+> - 实测 `import { brandString } from '@deepseek-ai/dsh-brand'` **成功**，`typeof === 'function'`
+> - 且 `dsh-llm` 现在导出 **`ToolCallId`**（函数，不叫 `CallId` 了）——`brand.d.ts:25,31`
+>
+> **📌 结论**：dsh 是 Developer Preview，**包导出会跨版本变化**。**本文的命令/写法必须注明当时的 dsh 版本**；跨版本参考时**先实测再照抄**。
+>
+> **出处**：本人两次实测（2026-09-16，`0.0.1-rc.1` → `0.1.5-rc.2`）
 
 ---
 
@@ -298,5 +304,5 @@ tool replied: [{"type":"text","text":"Hello, Cordis!"}]
 
 - **`dsh-*` 依赖要 `--legacy-peer-deps`**：`dsh-tools@0.0.1-rc.1` 的 peer 要 `dsh-agent@^0.0.1-rc.1`，而 npm 上只有 `0.1.0-rc.6`，直接装报 `ERESOLVE`。（出处：实测）
 - **peer 依赖需手动逐个补齐**：`--legacy-peer-deps` 不自动装 peer，运行时报 `Cannot find package '@deepseek-ai/dsh-xxx'`——按报错逐个 `npm install --legacy-peer-deps` 补齐（实测缺 `dsh-scope`、`dsh-timeout` 等）。（出处：实测）
-- **⚠️ `brandString` / `ToolCallId` 在 npm 版不可用**：官方代码用 `brandString<ToolCallId>`，但 npm `dsh-brand` 是纯类型包（无运行时导出），报 `does not provide an export named 'brandString'`。改用 `dsh-llm` 的 `CallId` 工厂：`import { CallId } from '@deepseek-ai/dsh-llm'` → `CallId('demo-1')`。（出处：实测 + `dsh-llm/lib/types/brand.d.ts:25,31`）
+- **⚠️ `brandString` / `ToolCallId` 可用性随版本变化**（重要教训）：`dsh-brand@0.0.1-rc.1` 是纯类型包、不导出 `brandString`（当时官方写法不可用，变通用 `dsh-llm` 的 `CallId`）；但 `0.1.5-rc.2` **已导出运行时 `brandString`**，官方写法可用，且 `dsh-llm` 现在导出的是 **`ToolCallId`**（不再叫 `CallId`）。**dsh 跨版本包导出会变，照抄前先实测。**（出处：本人两次实测 2026-09-16，`0.0.1-rc.1` → `0.1.5-rc.2`）
 - **缺 `system-prompt` 工具插件静默 PENDING**：`dsh-tools` 注入 `systemPrompt` 服务，组合中不列其提供方，工具插件会像 06 讲那样卡 PENDING。（出处：官方 07 讲）

@@ -372,6 +372,91 @@ DSH_PROFILE=headless ./start.sh --patch "$PWD/example/stage-03/plugins/llm-demo/
 
 ---
 
+## 七、进阶：适配器的两种写法（零依赖 vs 依赖式）
+
+写到这里有个**自然疑问**：既然 `LlmAdapter` 基类给了默认方法，**为什么适配器还能写这么长？** 这一节用**真实案例**回答——对比我们仓库里两个 CodeBuddy 适配器。
+
+### 背景：真实插件 `codebuddy-llm`
+
+`plugins/codebuddy-llm-v1/` 是照源码移植的**真插件**（接入腾讯 CodeBuddy）。它**最初用"零依赖"写法**——**因为 `--patch` 按绝对路径加载，插件目录解析不到 `@deepseek-ai/*` 包**，所以把 `dsh-llm` 的类型**本地抄了一遍**。
+
+> **出处**：源码 `plugins/codebuddy-llm-v1/codebuddy-llm.ts:4-6`（头注释）——*"零运行时依赖：`--patch` 按绝对路径加载本文件，插件目录解析不到 `@deepseek-ai/*` 包，因此 dsh-llm 的类型词汇表…在本文件内以结构等价的方式本地实现。"*
+
+### 两种写法对比（实测）
+
+后来我们把它重构成 **`codebuddy-llm-v2/`（依赖式）**：建 `node_modules/@deepseek-ai/*` 符号链接 → 能 `import` → 直接继承 `LlmAdapter`。
+
+| | **V1（零依赖）** | **V2（依赖式）** |
+|---|---|---|
+| 目录 | `plugins/codebuddy-llm-v1/` | `plugins/codebuddy-llm-v2/` |
+| 代码行数 | 1048 | **944**（省 104 行） |
+| `LlmAdapter` | 本地结构等价实现 | **`extends LlmAdapter`** |
+| `StreamChunk`/`GenerateOptions`/`Message`… | 本地抄 ~110 行 | **`import` from `@deepseek-ai/dsh-llm`** |
+| `ctx` 类型 | 本地 `PluginContext` 接口 | **真 `Context`** |
+| 依赖 | 无 | `node_modules` 符号链接 |
+| 分发形态 | 单文件自包含 | 需能解析到 dsh-llm |
+
+> **出处**：本人实测（2026-09-16）；两个目录见 `dsh-learn/plugins/codebuddy-llm-{v1,v2}/`
+
+### ⭐ 核心认知：**继承只省"类型"，不省"翻译"**
+
+**V2 省下的 104 行，几乎全是"本地类型定义"**（改成了 import）。但 **V2 仍有 944 行**——为什么？
+
+**因为"适配器"的本质工作是"翻译"**：把 `GenerateOptions` 翻译成**具体提供方的 wire 格式**、把提供方的流式响应翻译回 `StreamChunk`。**这个翻译逻辑，基类不可能替你写**——它不知道 CodeBuddy 的 API 长什么样。
+
+V2 的 944 行构成（`codebuddy-llm-v2.ts` 分区）：
+
+| 分区 | 行数 | 基类能帮吗？ |
+|---|---|---|
+| 配置（环境变量 + 设置页合成） | ~53 | ❌ 业务 |
+| ~~类型定义~~ | 已省 | ✅ **继承省的就是这块** |
+| 模型目录（CLI 模型清单） | ~52 | ❌ 数据 |
+| **JWT 身份提取** | ~42 | ❌ **CodeBuddy 特有** |
+| **请求头 CLI 伪装 + B3 追踪** | ~62 | ❌ **CodeBuddy 特有** |
+| **Token 三级回退** | ~96 | ❌ **CodeBuddy 特有** |
+| 请求序列化（`GenerateOptions`→wire） | ~104 | ❌ **翻译** |
+| HTTP 错误码映射 | ~23 | ❌ 翻译 |
+| SSE 解析 | ~59 | ❌ 网络协议 |
+| **wire chunk → `StreamChunk`** | ~175 | ❌ **核心翻译** |
+| 适配器类（覆写 `listModels`/`resolveModel`/`stream`） | ~106 | ⚠️ 契约实现 |
+| 设置面板集成 | ~96 | ❌ dsh 特有 |
+| 插件入口 | ~18 | — |
+
+> **出处**：本人实测（2026-09-16，`codebuddy-llm-v2.ts` 分区统计）
+
+**Go 类比**：你实现 `http.Handler` 接口——接口只规定 `ServeHTTP(w, r)` 的**签名**，但你的**业务逻辑（查库、序列化 JSON）一行都省不了**。**接口约束"形状"，不实现"内容"。**
+
+### 对照官方：适配器本来就"长"
+
+官方 `llm-deepseek` **4162 行**、`llm-pi-ai` **4022 行**——**都比我们的 V2（944 行）大得多**：
+
+> **出处**：`packages/llm/llm-deepseek/src/*.ts` + `llm-pi-ai/src/*.ts`（`wc -l`，2026-09-16）
+
+**原因**：官方支持完整功能（图片、推理、缓存、重试、多认证…），我们只做最小可用（文本 + 单轮认证）。**你的 V2 已是很精简的适配器了。**
+
+### 结论：依赖好，还是不依赖好？
+
+| 场景 | 推荐 |
+|---|---|
+| 正经发布插件（进 npm / bundle） | **依赖**（像官方——`peerDependencies` + 继承） |
+| `--patch` 单文件插件 | **符号链接依赖**（像 V2——干净）**或** 零依赖（像 V1——自包含，但抄类型易漂移） |
+| 零依赖的代价 | 抄类型、跟官方**易漂移**（官方改了 `StreamChunk`，你抄的那份会过期） |
+
+**一句话**：**"依赖"通常更好**（类型安全、跟随官方）；**零依赖是 `--patch` 场景的妥协**——V1 不依赖**不是因为更优，是因为它选了"单文件自包含"的分发形态**。
+
+### 附：这次重构修掉了 2 个真 bug
+
+重构时用项目自带的 **bugbot**（提交前 AI 扫描）检出了 **2 个 V1 就存在、被 V2 继承的缺陷**：
+
+1. **401/403 重试路径未释放首个响应体 → 连接泄漏**：重试时 `response` 被新请求直接覆盖，旧 body 既未读也未 cancel → undici keep-alive 池下 socket 泄漏。**修**：覆盖前 `await response.body?.cancel()`。（`codebuddy-llm-v2.ts`）
+2. **`login.mjs` URL 拼接把参数落进 fragment**：`authUrl` 若自带 `#frag`，字符串拼接会让 `client_id`/`scope` 落到 fragment、服务端收不到 → 登录静默失败。**修**：改用 `URL.searchParams.set()`。（`login.mjs`）
+
+> **出处**：bugbot 检出 + 本人修复（2026-09-16）
+
+**启示**：**抄来的代码会连 bug 一起继承**——V1 的 2 个 bug 原样进了 V2。重构（V2）的价值之一是**逼你重新审视每一行**。
+
+---
+
 ## 一页纸总结
 
 | 概念 | 一句话 | Go 类比 | 出处 |
@@ -385,6 +470,8 @@ DSH_PROFILE=headless ./start.sh --patch "$PWD/example/stage-03/plugins/llm-demo/
 | `registerAdapter` | 注册路由 + 返回 disposer（卸载自动反注册） | 路由注册 + defer | 源码 `index.ts:390` |
 | `GenerateOptions` | 完全装配好的提供方无关请求 | DTO | 源码 `types.ts:453` |
 | `brandString`/`ToolCallId` | id 工厂，**可用性跨版本变化** | 类型品牌 | `brand.ts:38` + 实测 |
+| **零依赖 vs 依赖式** | V1 本地抄类型 / V2 import+继承 | 具体类型 vs 接口 | `codebuddy-llm-{v1,v2}/` 实测 |
+| **继承只省"类型"** | 省的是类型定义；翻译逻辑基类帮不了 | 接口约束形状，不实现内容 | 实测统计 |
 
 ## 踩坑预防
 
@@ -394,6 +481,8 @@ DSH_PROFILE=headless ./start.sh --patch "$PWD/example/stage-03/plugins/llm-demo/
 - **⚠️ 适配器要能被 web UI 选到，必须实现 `listModels()`**：默认返回空会被 `catalog.ts:62` 的 `filter(models.length > 0)` 静默过滤掉。（出处：源码 + 实测）
 - **⚠️ `~/.dsh/settings.yaml` 优先级高于 patch**：headless 想切模型，得改 settings 里的 `agent-default-model`；**web 路径则无需碰 settings**（UI 里选）。（出处：本人实测）
 - **⚠️ headless 的模型路由来自 `agent-default-model`（非 `agent-loop` 的 `agents`）**。（出处：`dsh-headless/lib/index.js:130,133`）
+- **⚠️ `--patch` 绝对路径加载 → 插件目录无 node_modules → 解析不到 `@deepseek-ai/*`**：要么零依赖本地实现（V1），要么建符号链接（V2）。（出处：源码 + 实测）
+- **⚠️ 继承 `LlmAdapter` 不省"翻译"工作**：适配器的大头是把提供方 API ↔ dsh 协议互转，基类帮不了。（出处：实测统计）
 
 ## 下一步
 

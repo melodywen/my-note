@@ -352,6 +352,18 @@ export function apply(ctx: Context) {
 ### 跑法
 
 ```sh
+# 1) 解依赖（插件按绝对路径加载，解析不到 @deepseek-ai 包）
+GLOBAL_DSH=~/.nvm/versions/node/v24.14.0/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai
+cd ~/ai-work/dsh/dsh-learn/plugins/lifecycle-demo
+mkdir -p node_modules/@deepseek-ai
+for p in dsh-tools dsh-llm dsh-brand cordis schemastery cosmokit dsh-agent \
+         dsh-scope dsh-session dsh-invariants dsh-code-runtime \
+         dsh-system-prompt dsh-user-approval dsh-timeout; do
+  [ -e "$GLOBAL_DSH/$p" ] && ln -sfn "$GLOBAL_DSH/$p" "node_modules/@deepseek-ai/$p"
+done
+
+# 2) 清端口 + 执行
+pkill -9 -f "@deepseek-ai/dsh" 2>/dev/null; sleep 2
 cd ~/ai-work/dsh/dsh-learn
 ./start.sh --patch /Users/melodycchen/ai-work/dsh/dsh-learn/plugins/lifecycle-demo/cordis.patch.yml
 ```

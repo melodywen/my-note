@@ -68,7 +68,7 @@ dsh 插件用 **patch 覆盖层**：
       name: '/绝对路径/plugins/hello-plugin/hello-plugin.ts'
 ```
 
-> **出处**：`example/plugins/codebuddy-llm/cordis.patch.yml`（本仓库现有插件）+ 官方 `develop/basic/index.zh.md`——*"插件路径必须是绝对路径。patch 文件只贡献配置，不会改变 loader 解析模块路径时使用的 profile 目录。"*
+> **出处**：`plugins/codebuddy-llm/cordis.patch.yml`（本仓库现有插件）+ 官方 `develop/basic/index.zh.md`——*"插件路径必须是绝对路径。patch 文件只贡献配置，不会改变 loader 解析模块路径时使用的 profile 目录。"*
 
 **为什么是 `insert` 而不是顶层列表**：dsh 的 profile 已有大量内置插件（base 层），你的 patch 是**在它之上再叠一层**（AGENTS.md 说的"配置五层叠加"里的**用户层**）。`insert` = 插入，不改动已有配置。
 
@@ -78,7 +78,7 @@ dsh 插件用 **patch 覆盖层**：
 
 官方教程让你 `pnpm dsh web --patch ./scratch-plugin/cordis.yml`；本仓库封装成 `start.sh`：
 
-> **出处**：`dsh-learn/start.sh`——*"启动 dsh 时，一律优先使用本仓库根目录的 `./start.sh`……已自动把本仓库的 `example/plugins/codebuddy-llm/cordis.patch.yml` 作为 `--patch` 层挂上。"*
+> **出处**：`dsh-learn/start.sh`——*"启动 dsh 时，一律优先使用本仓库根目录的 `./start.sh`……已自动把本仓库的 `plugins/codebuddy-llm/cordis.patch.yml` 作为 `--patch` 层挂上。"*
 
 它默认挂 `codebuddy-llm` 那一层，并支持**再叠一层**：
 
@@ -148,7 +148,7 @@ export function apply(ctx: Context) {
       name: '/Users/melodycchen/ai-work/dsh/dsh-learn/example/plugins/hello-plugin/hello-plugin.ts'
 ```
 
-> **出处**：结构照搬 `example/plugins/codebuddy-llm/cordis.patch.yml`（本仓库现有插件）；`name` 需绝对路径见官方 `develop/basic/index.zh.md`
+> **出处**：结构照搬 `plugins/codebuddy-llm/cordis.patch.yml`（本仓库现有插件）；`name` 需绝对路径见官方 `develop/basic/index.zh.md`
 > ⚠️ **路径按你自己的实际路径改**（用 `pwd` 确认）
 
 ### 第 4 步：（建议）写 `package.json`
@@ -165,7 +165,7 @@ export function apply(ctx: Context) {
 }
 ```
 
-> **出处**：结构照搬 `example/plugins/codebuddy-llm/package.json`
+> **出处**：结构照搬 `plugins/codebuddy-llm/package.json`
 
 ### 第 5 步：干跑验证命令（不真正启动）
 

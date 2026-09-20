@@ -128,6 +128,33 @@ interface TeamTaskSnapshot {
 
 ---
 
+## 三·补：teammate 的"提示词"从哪来（⭐ 容易误解）
+
+**"每个队友的人设怎么写？"**——**分清两层**：
+
+| 层 | 是什么 | 能改吗 |
+|---|---|---|
+| **① 系统提示词**（persona 段 / 工具用法段…） | teammate 的"系统提示词" | ❌ **改不了**——**继承 Lead 的 preset** |
+| **② 初始 prompt**（首条 user 消息） | `spawn_teammate` 的 `prompt` | ✅ **你能给**——**"角色人设"就写在这** |
+
+**铁证**（源码）：
+> **出处**：`subagent/src/child-agent.ts:145`（逐字）——`const agentPreset = parent.ctx.get('agentPresets')?.composedPreset(parent.ctx)`
+> **出处**：`:205`——`childCtx.get('agentPresets')?.composeFrom(childCtx, parent.ctx)`
+
+**即**：**teammate 的 preset（系统提示词）读的是【父 agent（Lead）的 preset】**——**跟你 spawn 时传啥无关**。
+
+**所以**：
+- **"人设"= `spawn_teammate` 的 `prompt`**（首条消息）——**不是"系统提示词"**
+- **你控制的是"初始 prompt"，不是"系统提示词"**
+
+> **⚠️ 推论**：**想给不同队友"不同的系统提示词"，agent-team 做不到**（都继承 Lead 的 preset）——**能区分的只有"初始 prompt"**。
+
+> **实现"提前声明人设"的可行做法**：**提前写好 md 人设文件**（如 `roles/pm-reviewer.md`）→ **Lead 读它 → 作为 `spawn_teammate` 的 `prompt`**。（案例见 `example/deepwater/agent-team-demo/需求评审会案例.md）
+
+> **对比**：**Claude Code 的 Team 能"引用 subagent 定义"自定义 teammate 系统提示词**——详见 **07.1 篇**。
+
+---
+
 ## 四、⭐ 使用纪律（POLICY，逐字要点）
 
 > **出处**：`tool-agent-team/src/index.ts:31`（POLICY，逐字）

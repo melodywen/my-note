@@ -272,10 +272,10 @@ abstract class WorkflowEngine {
 
 > **出处**：`packages/workflow/{tool-workflow,tool-ralph}/`
 
-| 工具 | 说明 |
-|---|---|
-| **`workflow`**（`tool-workflow`） | 默认工具名 `workflow`——**模型写脚本** |
-| **`ralph`**（`tool-ralph`） | *"Workflow vs Ralph"*——**Ralph 循环**（另一种编排消费方，需显式启用） |
+| 工具                              | 说明                                                  |
+| ------------------------------- | --------------------------------------------------- |
+| **`workflow`**（`tool-workflow`） | 默认工具名 `workflow`——**模型写脚本**                         |
+| **`ralph`**（`tool-ralph`）       | *"Workflow vs Ralph"*——**Ralph 循环**（另一种编排消费方，需显式启用） |
 
 **base bundle 默认挂**：`workflow-ptc` + `tool-workflow`（`:372-378`）；`tool-ralph`（`:426`）。
 

@@ -123,6 +123,14 @@ const id = ctx.jobs.start({
 
 **裁定**：追史 job 的**主观察面是知识库面板自身**（unowned job 的事实主人）：显示 `knowledge-base-history-3 (running)`、批次进度、待审篇数徽章。会话头部的 jobs 弹层是顺路可见的次要观察面（unowned job 对非 agent 调用方可见，文档：*"a non-agent caller sees only unowned jobs"*；具体呈现实现期验证 ⚠️）。
 
+## 四之二、失败降级（2026-09-27 洞3 裁定）
+
+| 故障 | 处理 |
+|---|---|
+| job 跑一半挂（API 断/进程退） | **重跑**——从游标断点继续；归档过的文章不会重写（游标幂等，02-F 决议天然支撑） |
+| 单 commit diff 超大爆 token | **不砍内容，拆多篇**：一个 commit id 允许多篇文章共享（「一篇一事」细化到 diff 分片）；Agent 分段读、分段写、边读边写，无需一口气读完再综合 |
+| 5 篇全被审阅打回 | 回到批次计划（E3）重排，不算故障路径 |
+
 ## 五、Git 集成（建库与增量）
 
 ### 建库校验（R4/R5/R6）

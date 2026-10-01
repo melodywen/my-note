@@ -115,13 +115,14 @@ tags:
     │       ├── 20-术语表/
     │       ├── 30-目录/
     │       └── _追踪.md                  ← 追史游标（lastChased / lastSeenHead）
-    └── workspace/                        ← 工作区（Agent 的 cwd）
-        ├── knowledge-base -> <绝对路径>/<指纹>/knowledge-base/<vaultPath>/   ← 软链指向知识库内容
+    └── workspace/                        ← Agent 的 cwd（工作空间）
         └── repos/                        ← 被跟踪项目（有 working tree 的 clone）
             ├── 仓库A/                     ← git checkout 到对应 commit
             ├── 仓库B/
             └── 仓库C/
 ```
+
+Agent 的 cwd 是 `workspace/`，通过相对路径 `../knowledge-base/<vaultPath>/` 访问知识库，`repos/<仓库名>/` 访问代码。侧边栏工作空间标题为 `知识库-<库名>`。
 
 ### 被跟踪仓库的 clone 策略
 
@@ -257,20 +258,22 @@ export const inject = ['llm capabilities', 'jobs', 'skills', 'agents', 'agentPre
 # 追史任务
 
 ## 工作空间
-- 知识库：workspace/knowledge-base/（软链）
-- 被跟踪仓库：workspace/repos/仓库A/
+- 当前工作目录是 workspace
+- 知识库：../knowledge-base/<vaultPath>/（已有史实在 10-史实/ 下）
+- 被跟踪仓库：repos/仓库A/
 - 当前 commit：<hash>
 - 当前 commit 日期：<date>
 - 当前 commit 作者：<author>
 - 当前 commit 主题：<subject>
+- 归档路径：../knowledge-base/<vaultPath>/10-史实/<域>/@<repo>/<date>-<title>.md
 
 ## 任务步骤
 1. 执行 `git checkout <hash>` 切到当前 commit
 2. 阅读当前代码结构，理解项目架构
 3. 阅读当前 commit 的 diff（`git show <hash>`）
-4. 阅读 workspace/knowledge-base/10-史实/ 下已有的史实文章
+4. 阅读 ../knowledge-base/<vaultPath>/10-史实/ 下已有的史实文章
 5. 结合代码上下文 + diff + 已有史实，生成本层的增量内容
-6. 写到归档路径 10-史实/<域>/@<repo>/<date>-<title>.md
+6. 写到归档路径
 
 ## 写作规范
 （引用 Skill 的 system prompt）

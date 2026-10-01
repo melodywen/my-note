@@ -224,7 +224,7 @@ commit 12: ClickAdapter 增加 debounce 逻辑                   ← 第 3 层�
 
 ```typescript
 // 1. 创建 workspace
-const workspace = await ctx.workspaceRegistry.create(workspacePath)
+const workspace = await ctx.workspaceRegistry.create(workspacePath, '知识库-<库名>')
 
 // 2. 创建 Agent + Session（出现在侧边栏）
 const handle = await ctx.agents.create({
@@ -236,7 +236,10 @@ const handle = await ctx.agents.create({
   },
 })
 
-// 3. 发第一条消息（触发 agent loop）
+// 3. 把会话挂到 workspace——不调这步会话会落「未分组」
+await workspace.attachSession(sessionId)
+
+// 4. 发第一条消息（触发 agent loop）
 handle.agent.followup(createUserMessage({
   content: [{ type: 'text', text: prompt }],
 }))

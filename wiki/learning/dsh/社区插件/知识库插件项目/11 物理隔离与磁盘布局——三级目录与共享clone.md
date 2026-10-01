@@ -30,8 +30,7 @@ updated: 2026-09-30
 │   │   ├── .git/                         ← git init + remote add origin
 │   │   └── ecology_agent/                ← 库内容（vaultPath，多库共享同一远端各写各的子路径）
 │   │       ├── 00-总表/
-│   │       ├── 10-史实/
-│   │       └── 50-草稿区/
+│   │       └── 10-史实/
 │   └── workspace/                        ← 工作区（agent 追史时的 cwd）
 │       ├── knowledge-base -> ~/.dsh/knowledge-base/f5118295/knowledge-base/ecology_agent/   ← 软链指向知识库内容
 │       └── repos/                        ← 跟踪的仓库
@@ -52,7 +51,7 @@ updated: 2026-09-30
 | 第一层 | `<指纹>/` | 远端指纹（URL FNV-1a hash），一个远端一个目录 |
 | 第二层 | `knowledge-base/` | 知识库自身的远端 working clone（git init + remote add） |
 | 第二层 | `workspace/` | agent 工作区，与知识库克隆同级 |
-| 第三层 | `knowledge-base/<vaultPath>/` | 库内容（00-总表/10-史实/50-草稿区），多个库各写各的子路径 |
+| 第三层 | `knowledge-base/<vaultPath>/` | 库内容（00-总表/10-史实/20-快照），多个库各写各的子路径 |
 | 第三层 | `workspace/repos/<仓库名>/` | 被跟踪仓库的真实 git working clone，跟几个就有几个 |
 | 软链 | `workspace/knowledge-base` | 指向 `<指纹>/knowledge-base/<vaultPath>/`，agent 通过它读写草稿 |
 

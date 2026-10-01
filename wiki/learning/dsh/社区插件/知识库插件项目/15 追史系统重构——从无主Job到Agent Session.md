@@ -25,7 +25,7 @@ tags:
 - 没有归属会话（无 owner session）
 - 用户在插件面板点"立即追史"→ 调插件自己的 HTTP API → 后台裸脚本执行
 - LLM 流的 chunk 类型是 `text-delta`，逐 token 拼接成文章
-- 生成完写到 `50-草稿区/`，等人工审阅
+- 生成完直接写到归档路径 10-史实/，等人工审阅
 - 游标 `lastChased` 记在磁盘 `_追踪.md`（存于库内容根目录），从旧到新顺序追
 
 ### 1.2 核心问题
@@ -114,7 +114,6 @@ tags:
     │       │               └── 当前能力.md                         ← 当前能力层
     │       ├── 20-术语表/
     │       ├── 30-目录/
-    │       ├── 50-草稿区/
     │       └── _追踪.md                  ← 追史游标（lastChased / lastSeenHead）
     └── workspace/                        ← 工作区（Agent 的 cwd）
         ├── knowledge-base -> <绝对路径>/<指纹>/knowledge-base/<vaultPath>/   ← 软链指向知识库内容
@@ -158,7 +157,7 @@ commit 12: ClickAdapter 增加 debounce 逻辑                   ← 第 3 层�
 4. 读知识库已有的存量文章             ← 之前叠出来的层
 5. 结合代码上下文 + 历史增量 + diff   ← LLM 理解"在什么基础上改的"
 6. 生成这一层的史实（增量叠加）       ← 往已有功能点结构上追加
-7. 写到知识库草稿区                  ← 50-草稿区/
+7. 写到归档路径                    ← 10-史实/<域>/@<repo>/
 8. 推进游标                          ← 更新 _追踪.md
 9. 创建下一个 commit 的会话           ← 继续叠
 ```
@@ -271,7 +270,7 @@ export const inject = ['llm capabilities', 'jobs', 'skills', 'agents', 'agentPre
 3. 阅读当前 commit 的 diff（`git show <hash>`）
 4. 阅读 workspace/knowledge-base/10-史实/ 下已有的史实文章
 5. 结合代码上下文 + diff + 已有史实，生成本层的增量内容
-6. 写到 workspace/knowledge-base/50-草稿区/<date>-<title>.md
+6. 写到归档路径 10-史实/<域>/@<repo>/<date>-<title>.md
 
 ## 写作规范
 （引用 Skill 的 system prompt）

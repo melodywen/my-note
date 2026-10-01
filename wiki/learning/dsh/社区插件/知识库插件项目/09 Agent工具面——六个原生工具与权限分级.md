@@ -31,7 +31,7 @@ updated: 2026-09-27
 | `knowledge_base_search(scope, query, limit?)` | ✅ | ✅（搜索框） | 跨库检索，返回摘要行（标题+路径+snippet）；查询先过术语表扩展再进 FTS5 |
 | `knowledge_base_read(path)` | ✅ | ✅（点击即读） | 读全文（两级火箭第二级）；受单次注入上限约束 |
 | `knowledge_base_browse(what, target)` | ✅ | ✅ | 浏览结构：能力域清单 / 进度游标 / 术语表 / 库清单——**与 search 心智分离**（看结构 vs 找内容） |
-| `knowledge_base_submit(库, 类型, 内容)` | ✅ | ✅（手动添加） | **统一显式提交入口**：好代码片段/方法论/API 案例/编码习惯主动声明、旁证存储——参数区分类型，落草稿区 |
+| `knowledge_base_submit(库, 类型, 内容)` | ✅ | ✅（手动添加） | **统一显式提交入口**：好代码片段/方法论/API 案例/编码习惯主动声明、旁证存储——参数区分类型，直接写归档路径 |
 | `knowledge_base_run_task(任务类型, 目标)` | ✅ | ✅（主入口） | 会话侧起 job：追史/归纳习惯（面板按钮为主、对话指令为辅——03 遗留项就此落定） |
 | `knowledge_base_adopt(草稿id, 修订?)` | ❌ **面板专属** | ✅ | 审阅归档（批准/打回）——**人的主权动作**，模型不可代批 |
 
@@ -44,7 +44,7 @@ updated: 2026-09-27
 ├─ knowledge_base_search  只读        └─ knowledge_base_adopt  写正式区的主权动作
 ├─ knowledge_base_read    只读
 ├─ knowledge_base_browse  只读        理由：审阅闭环的最后一道闸必须是人亲手点——
-├─ knowledge_base_submit  写草稿区      「批准」若模型可调，等于模型能自我批准，
+├─ knowledge_base_submit  写归档路径      「批准」若模型可调，等于模型能自我批准，
 └─ knowledge_base_run_task 起 job       human-in-the-loop 就在最后一厘米失守
 ```
 
@@ -56,7 +56,7 @@ updated: 2026-09-27
 |---|---|
 | 03 | `knowledge_base_run_task` → `ctx.jobs.start`（kind: kb-history / kb-habit）；生成 skill 隐藏 |
 | 08 | `knowledge_base_search`/`knowledge_base_read` = 两级火箭；习惯库全量注入例外 |
-| 02/04 | `knowledge_base_submit` → 草稿区 → 审阅 → `knowledge_base_adopt` 归档（面板）→ 索引刷新 |
+| 02/04 | `knowledge_base_submit` → 写归档路径 → 审阅 → `knowledge_base_adopt` 确认归档（面板）→ 索引刷新 |
 | 06 | 2b 观察钩子 = 事件监听（非工具） |
 | 01 | 面板侧同款能力（搜索框/手动添加/审阅按钮）共享 Host 服务 |
 

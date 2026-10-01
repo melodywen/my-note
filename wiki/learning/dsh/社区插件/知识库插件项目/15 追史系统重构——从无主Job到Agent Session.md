@@ -26,7 +26,7 @@ tags:
 - 用户在插件面板点"立即追史"→ 调插件自己的 HTTP API → 后台裸脚本执行
 - LLM 流的 chunk 类型是 `text-delta`，逐 token 拼接成文章
 - 生成完写到 `50-草稿区/`，等人工审阅
-- 游标 `lastChased` 记在磁盘 `.chase-cursor.json`，从旧到新顺序追
+- 游标 `lastChased` 记在磁盘 `_追踪.md`（存于库内容根目录），从旧到新顺序追
 
 ### 1.2 核心问题
 
@@ -67,22 +67,17 @@ tags:
 - 用户点进去，能看到完整的对话过程：git checkout、读 diff、读存量、LLM 生成、写草稿
 - 全部是 dsh 原生的对话展示，不需要插件自己造 UI
 
-### 2.2 执行模式：串行，每个 commit 一个会话
+### 2.2 执行模式：逐篇生成，审一篇才能下一篇
 
 ```
-仓库 A commit 1 → 创建会话 → 完成 → 侧边栏留下对话记录
-仓库 A commit 2 → 创建会话 → 完成 → 侧边栏又一条
-...
-仓库 A 全部追完
-仓库 B commit 1 → 创建会话 → 完成
-...
+事情 1 → 创建会话 → 生成草稿 → 审阅通过 → 事情 2 → 创建会话 → ...
 ```
 
-**串行不并发**，原因：
+**逐篇生成**，原因：
 
-1. 知识库的存量文章是共享的，commit 2 需要读 commit 1 写的层
-2. 同一个仓库的 working tree 只能 checkout 到一个 commit
-3. 侧边栏会话按时间顺序排列，串行才能看到清晰的"一层层叠加"脉络
+1. 串行保证上下文准确——第一篇偏了后面全偏
+2. 知识库的存量文章是共享的，事情 2 需要读事情 1 写的层
+3. 侧边栏会话按时间顺序排列，逐篇才能看到清晰的"一层层叠加"脉络
 
 ### 2.3 每个会话的共同点与差异
 
@@ -98,15 +93,15 @@ tags:
 
 ---
 
-## 三、目录结构重构
-
-### 3.1 新目录结构
+## 三、目录结构
 
 ```
 ~/.dsh/knowledge-base/
-└── <指纹>/                              ← 知识库 git 远端的指纹
-    ├── remotes/                          ← 知识库工作克隆（git clone）
-    │   └── <vaultPath>/                  ← 环境库在仓库里的子路径
+└── <指纹>/                              ← 远端指纹（URL hash）
+    ├── knowledge-base/                   ← 知识库克隆（远端 working clone）
+    │   ├── .git/
+    │   └── <vaultPath>/                  ← 库内容（多个库共享同一远端各写各的子路径）
+    │       ├── 00-总表/
     │       ├── 10-史实/
     │       │   ├── <域>/
     │       │   │   └── @<仓库名>/
@@ -120,29 +115,18 @@ tags:
     │       ├── 20-术语表/
     │       ├── 30-目录/
     │       ├── 50-草稿区/
-    │       └── .chase-cursor.json
+    │       └── _追踪.md                  ← 追史游标（lastChased / lastSeenHead）
     └── workspace/                        ← 工作区（Agent 的 cwd）
-        ├── knowledge-base/               ← 软链 → ../remotes/<vaultPath>
+        ├── knowledge-base -> <绝对路径>/<指纹>/knowledge-base/<vaultPath>/   ← 软链指向知识库内容
         └── repos/                        ← 被跟踪项目（有 working tree 的 clone）
             ├── 仓库A/                     ← git checkout 到对应 commit
             ├── 仓库B/
             └── 仓库C/
 ```
 
-### 3.2 与旧目录结构的对比
+### 被跟踪仓库的 clone 策略
 
-| 旧结构 | 新结构 | 变化 |
-|--------|--------|------|
-| `remotes/<指纹>/` | `<指纹>/remotes/` | 指纹提为顶层目录 |
-| `repos/<指纹>/repo.git`（bare clone） | `<指纹>/workspace/repos/仓库A/`（有 working tree） | 改为有 working tree 的 clone，能 git checkout |
-| 无 workspace 概念 | `<指纹>/workspace/` | 新增工作区，Agent 的 cwd |
-| 无软链 | `workspace/knowledge-base/` → `../remotes/<vaultPath>` | Agent 通过软链读写知识库 |
-
-### 3.3 被跟踪仓库的 clone 策略
-
-旧：`repos/<指纹>/repo.git` 是 bare clone（只读，无 working tree）
-
-新：`workspace/repos/<仓库名>/` 是完整 clone（有 working tree），追史时 `git checkout <commit>` 切到对应提交
+`workspace/repos/<仓库名>/` 是完整 clone（有 working tree），追史时 `git checkout <commit>` 切到对应提交。
 
 - 多个知识库跟踪同一个仓库时，每个知识库的 workspace 下各有独立 clone（不共享），因为不同知识库可能需要 checkout 到不同 commit
 - clone 使用仓库名（而非指纹）作为目录名，便于 Agent 和人类阅读
@@ -175,21 +159,11 @@ commit 12: ClickAdapter 增加 debounce 逻辑                   ← 第 3 层�
 5. 结合代码上下文 + 历史增量 + diff   ← LLM 理解"在什么基础上改的"
 6. 生成这一层的史实（增量叠加）       ← 往已有功能点结构上追加
 7. 写到知识库草稿区                  ← 50-草稿区/
-8. 推进游标                          ← 更新 .chase-cursor.json
+8. 推进游标                          ← 更新 _追踪.md
 9. 创建下一个 commit 的会话           ← 继续叠
 ```
 
-### 4.3 与旧生成策略的对比
-
-| | 旧策略 | 新策略 |
-|---|---|---|
-| LLM 看到的 | 只有 commit diff | 完整代码快照 + diff + 已有史实层 |
-| 文章关系 | 每个 commit 独立成文 | 按功能点分层叠加，有累积关系 |
-| 外链索引 | 无 | 标注对应文件路径 + 函数名 |
-| 设计模式识别 | 无 | 识别观察者、适配器等模式，按模式结构分层 |
-| 准确性 | LLM 不知道"在什么基础上改的" | LLM 能看到完整代码上下文 |
-
-### 4.4 外链索引格式
+### 4.3 外链索引格式
 
 文章里标注代码位置，不需要精确到行号，精确到"文件 + 函数"即可：
 
@@ -228,18 +202,7 @@ commit 12: ClickAdapter 增加 debounce 逻辑                   ← 第 3 层�
 
 ---
 
-## 六、追史提示词（Skill）改造方向
-
-### 6.1 当前 Skill 的问题
-
-当前 SKILL.md 的生成策略：
-
-- "一篇一事" — 每个 commit 独立成文
-- 不看代码上下文，只看 commit diff 材料
-- 无分层叠加概念
-- 无外链索引要求
-
-### 6.2 新 Skill 需要定义的规范
+## 六、追史提示词（Skill）规范
 
 1. **Docker image 式分层** — 每篇文章是一个"层"，往已有功能点上叠加
 2. **读存量** — 生成前先读已有的史实文章，理解之前叠了哪些层
@@ -285,7 +248,6 @@ handle.agent.followup(createUserMessage({
 export const inject = ['llm capabilities', 'jobs', 'skills', 'agents', 'agentPresets', 'workspaceRegistry']
 ```
 
-新增三个：
 - `agents` — 创建 Agent + Session
 - `agentPresets` — 解析和挂载 preset
 - `workspaceRegistry` — 创建 workspace

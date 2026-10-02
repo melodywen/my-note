@@ -95,6 +95,8 @@ tags:
 
 ## 三、目录结构
 
+> 与 [[11 物理隔离与磁盘布局——三级目录与共享clone]] 第二节一致，此处只列追史相关的子树。
+
 ```
 ~/.dsh/knowledge-base/
 └── <指纹>/                              ← 远端指纹（URL hash）
@@ -102,27 +104,30 @@ tags:
     │   ├── .git/
     │   └── <vaultPath>/                  ← 库内容（多个库共享同一远端各写各的子路径）
     │       ├── 00-总表/
+    │       │   ├── _库.json
+    │       │   └── 仓库登记簿.md
     │       ├── 10-史实/
-    │       │   ├── <域>/
-    │       │   │   └── @<仓库名>/
-    │       │   │       ├── 2026-01-15-初始化ObserverPattern.md   ← 第 1 层
-    │       │   │       ├── 2026-01-20-新增ClickAdapter.md         ← 第 2 层
-    │       │   │       └── 2026-02-10-ClickAdapter增加debounce.md ← 第 3 层
-    │       │   └── @快照/
-    │       │       └── <域>/
-    │       │           └── @<仓库名>/
-    │       │               └── 当前能力.md                         ← 当前能力层
-    │       ├── 20-术语表/
-    │       ├── 30-目录/
-    │       └── _追踪.md                  ← 追史游标（lastChased / lastSeenHead）
+    │       │   └── @<仓库名>/             ← 第一级：仓库
+    │       │       ├── _追踪.md            ← 追史游标
+    │       │       ├── <主领域>/           ← 第二级：主领域（代码层级）
+    │       │       │   └── <场景文档>.md
+    │       │       └── <主领域>/
+    │       │           └── <子领域>/       ← 第三级：子领域（需要拆时才建）
+    │       │               └── <场景文档>.md
+    │       └── 20-快照/
+    │           └── @<仓库名>/
+    │               └── 当前能力.md
     └── workspace/                        ← Agent 的 cwd（工作空间）
+        ├── knowledge-base -> <指纹>/knowledge-base/<vaultPath>/   ← 软链指向库内容
         └── repos/                        ← 被跟踪项目（有 working tree 的 clone）
             ├── 仓库A/                     ← git checkout 到对应 commit
             ├── 仓库B/
             └── 仓库C/
 ```
 
-Agent 的 cwd 是 `workspace/`，通过相对路径 `../knowledge-base/<vaultPath>/` 访问知识库，`repos/<仓库名>/` 访问代码。侧边栏工作空间标题为 `知识库-<库名>`。
+Agent 的 cwd 是 `workspace/`，通过软链 `knowledge-base/` 读写史实草稿，`repos/<仓库名>/` 访问代码。侧边栏工作空间标题为 `知识库-<库名>`。
+
+主领域（代码层级）枚举见 [[11 物理隔离与磁盘布局——三级目录与共享clone#10-史实/ 的目录层级]]。
 
 ### 被跟踪仓库的 clone 策略
 
@@ -158,7 +163,7 @@ commit 12: ClickAdapter 增加 debounce 逻辑                   ← 第 3 层�
 4. 读知识库已有的存量文章             ← 之前叠出来的层
 5. 结合代码上下文 + 历史增量 + diff   ← LLM 理解"在什么基础上改的"
 6. 生成这一层的史实（增量叠加）       ← 往已有功能点结构上追加
-7. 写到归档路径                    ← 10-史实/<域>/@<repo>/
+7. 写到归档路径                    ← 10-史实/@<repo>/<主领域>/
 8. 推进游标                          ← 更新 _追踪.md
 9. 创建下一个 commit 的会话           ← 继续叠
 ```
@@ -168,8 +173,8 @@ commit 12: ClickAdapter 增加 debounce 逻辑                   ← 第 3 层�
 文章里标注代码位置，不需要精确到行号，精确到"文件 + 函数"即可：
 
 ```markdown
-> 本层新增 `ClickAdapter`（[`src/adapters/ClickAdapter.ts`](../repos/仓库A/src/adapters/ClickAdapter.ts) · `ClickAdapter` 类），
-> 继承自 `BaseObserver`（[`src/patterns/ObserverPattern.ts`](../repos/仓库A/src/patterns/ObserverPattern.ts) · `BaseObserver` 抽象类）。
+> 本层新增 `ClickAdapter`（[`src/adapters/ClickAdapter.ts`](repos/仓库A/src/adapters/ClickAdapter.ts) · `ClickAdapter` 类），
+> 继承自 `BaseObserver`（[`src/patterns/ObserverPattern.ts`](repos/仓库A/src/patterns/ObserverPattern.ts) · `BaseObserver` 抽象类）。
 ```
 
 ---
@@ -184,7 +189,7 @@ commit 12: ClickAdapter 增加 debounce 逻辑                   ← 第 3 层�
 | 回答的问题 | 为什么这样设计、踩过什么坑、什么时候改的 | 现在代码能做什么、有哪些能力、接口是什么 |
 | 生成时机 | 每个 commit 追史时生成 | 追平后基于 master 生成一次 |
 | 跟代码的关系 | 切到对应 commit 看当时的代码 | 只看 master 最新代码 |
-| 存放位置 | `10-史实/<域>/<@仓库名>/` | `10-史实/@快照/<域>/<@仓库名>/` |
+| 存放位置 | `10-史实/@<仓库名>/<主领域>/` | `20-快照/@<仓库名>/` |
 | 时间线 | 有，按 commit 顺序 | 无，只反映当前 master 状态 |
 | 性质 | 历史记录 | 功能能力提取 |
 
@@ -207,8 +212,8 @@ commit 12: ClickAdapter 增加 debounce 逻辑                   ← 第 3 层�
 1. **Docker image 式分层** — 每篇文章是一个"层"，往已有功能点上叠加
 2. **读存量** — 生成前先读已有的史实文章，理解之前叠了哪些层
 3. **代码上下文** — Agent 的 workspace 里有完整代码，要主动读
-4. **功能点聚合** — 识别哪些 commit 属于同一个功能点
-5. **分层抽象原则** — 只要某个东西有"一层一层往上叠"的结构，就按层组织。不限于设计模式（观察者、适配器、抽象类），也包括模块拆分、接口演进、功能迭代、重构等。具体规则：有复用、有独立迭代轨迹的才拆层（如多个 Adapter 共享基类 → 基类一层、每个 Adapter 各一层）；没有的写在一起（如只有一个 Adapter → 不用拆）
+4. **场景按入口写** — 一个场景从入口到出口完整写在一篇文档里，从哪层进入就从哪层开始写，一路写到最底层
+5. **分层抽象原则** — 只要某个东西有"一层一层往上叠"的结构，就按层组织。不限于设计模式（观察者、适配器、抽象类），也包括模块拆分、接口演进、功能迭代、重构等。具体规则：有复用、有独立迭代轨迹的才抽成独立文件（如多个 Adapter 共享基类 → 基类一篇、每个 Adapter 各一篇）；没有的写在一起（如只有一个 Adapter → 不用拆）
 6. **外链索引** — 标注对应文件路径 + 函数名
 7. **分层标记** — 标记清楚这篇文章是哪一层、叠在哪个功能点上即可，具体措辞由提示词模板决定
 
@@ -262,19 +267,19 @@ export const inject = ['llm capabilities', 'jobs', 'skills', 'agents', 'agentPre
 
 ## 工作空间
 - 当前工作目录是 workspace
-- 知识库：../knowledge-base/<vaultPath>/（已有史实在 10-史实/ 下）
+- 知识库：knowledge-base/（软链指向库内容，已有史实在 10-史实/ 下）
 - 被跟踪仓库：repos/仓库A/
 - 当前 commit：<hash>
 - 当前 commit 日期：<date>
 - 当前 commit 作者：<author>
 - 当前 commit 主题：<subject>
-- 归档路径：../knowledge-base/<vaultPath>/10-史实/<域>/@<repo>/<date>-<title>.md
+- 归档路径：knowledge-base/10-史实/@<repo>/<主领域>/<title>.md
 
 ## 任务步骤
 1. 执行 `git checkout <hash>` 切到当前 commit
 2. 阅读当前代码结构，理解项目架构
 3. 阅读当前 commit 的 diff（`git show <hash>`）
-4. 阅读 ../knowledge-base/<vaultPath>/10-史实/ 下已有的史实文章
+4. 阅读 knowledge-base/10-史实/ 下已有的史实文章
 5. 结合代码上下文 + diff + 已有史实，生成本层的增量内容
 6. 写到归档路径
 

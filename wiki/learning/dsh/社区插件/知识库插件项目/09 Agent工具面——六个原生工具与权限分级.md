@@ -30,7 +30,7 @@ updated: 2026-09-27
 |---|---|---|---|
 | `knowledge_base_search(scope, query, limit?)` | ✅ | ✅（搜索框） | 跨库检索，返回摘要行（标题+路径+snippet）；查询先过术语表扩展再进 FTS5 |
 | `knowledge_base_read(path)` | ✅ | ✅（点击即读） | 读全文（两级火箭第二级）；受单次注入上限约束 |
-| `knowledge_base_browse(what, target)` | ✅ | ✅ | 浏览结构：能力域清单 / 进度游标 / 术语表 / 库清单——**与 search 心智分离**（看结构 vs 找内容） |
+| `knowledge_base_browse(what, target)` | ✅ | ✅ | 浏览结构：代码层级目录 / 进度游标 / 术语表 / 库清单——**与 search 心智分离**（看结构 vs 找内容） |
 | `knowledge_base_submit(库, 类型, 内容)` | ✅ | ✅（手动添加） | **统一显式提交入口**：好代码片段/方法论/API 案例/编码习惯主动声明、旁证存储——参数区分类型，直接写归档路径 |
 | `knowledge_base_run_task(任务类型, 目标)` | ✅ | ✅（主入口） | 会话侧起 job：追史/归纳习惯（面板按钮为主、对话指令为辅——03 遗留项就此落定） |
 | `knowledge_base_adopt(草稿id, 修订?)` | ❌ **面板专属** | ✅ | 审阅归档（批准/打回）——**人的主权动作**，模型不可代批 |

@@ -214,7 +214,7 @@ related:
 
 ### 11. 语言
 
-`autoCaptureLanguage` 默认 `"auto"` 自动检测。如果发现中文对话被存成英文摘要(或相反),可以固定为 `"zh"` 或 `"en"`。
+`autoCaptureLanguage` 默认 `"auto"` 自动检测。**本机实测 `glm-5.2` 在 auto 下会乱跳语言**:同一场中文对话的摘要被写成瑞典语、罗马尼亚语、克罗地亚语、索马里语、法语。语言一乱,不仅难读,中文提问也更难召回它们。所以本机固定为 `"zh"`。
 
 ### 12. 想把记忆当文档管理(v2.41.0 实测有 bug,本机已关)
 
@@ -331,7 +331,6 @@ related:
 
 | 配置项 | 建议值 | 原因 |
 |---|---|---|
-| `autoCaptureLanguage` | 用默认 `"auto"`,不写 | 发现摘要语言不对再固定 `"zh"` |
 | `autoUpdate` | 用默认 `true`,不写 | 想稳定再写 `false` 或固定版本号 |
 | `showUserProfileToasts` | 用默认 `true`,不写 | 保持弹出,方便知道画像何时更新 |
 | `databaseEncryptionEnabled` | 用默认 `false`,不写 | 想加密落盘数据再开 |
@@ -361,6 +360,9 @@ related:
 
   // ===== 成本和资源 =====
   "embeddingIdleTimeoutMs": 600000,
+
+  // ===== 摘要语言 =====
+  "autoCaptureLanguage": "zh",            // glm-5.2 在 auto 下会把摘要写成瑞典语/索马里语/法语等,固定为中文
 
   // ===== 记忆保留(重要记忆请在网页界面置顶)=====
   "autoCleanupRetentionDays": 365,        // 365 天没被"写过"且没置顶才会删;被搜索/注入不算。重要的请置顶

@@ -10,6 +10,11 @@ updated: 2026-11-05
 
 ---
 
+## [2026-11-05] update | opencode-mem 固定摘要语言并清理
+- 实测 `glm-5.2` 在 `autoCaptureLanguage: "auto"` 下把中文对话的摘要写成瑞典语、罗马尼亚语、克罗地亚语、索马里语、法语。本机固定为 `"zh"`,更新 [[opencode-mem-值得调整的配置]](第 11 节、"看情况"表、JSON 示例)。
+- 清理:删掉 37 条缺 `promptId` 的自动捕获记忆(软删除,可从回收站恢复),网页 20 页逐页翻通过,无 `each_key_duplicate`;另删 2 条过时摘要(索马里语、法语)、本地 `opencode-mem-vault` 目录、旧 nomic 嵌入模型缓存(约 523MB)。
+- 未验证:服务重启后"关 markdown"与"摘要固定中文"是否生效、新记忆是否保留 `promptId`。
+
 ## [2026-11-05] update | opencode-mem 关闭 markdown 后端
 - 根因:markdown 后端每次启动全量扫描 md,按 md 重写数据库;md 文件头无 `promptId`,重写时把它抹掉,网页配不上记忆与提问,报 `each_key_duplicate` 崩溃。实测 37 条缺 `promptId` 的记忆全带 `markdownContentHash`,2 条最新的有 `promptId` 且全无该标记。
 - 决定:去掉 `memoryBackend`/`markdownPath`,回到默认 `database`;不再使用 `opencode-mem-vault` 仓库。更新 [[opencode-mem-值得调整的配置]](第 12 节、"看情况"表、JSON 示例)、[[opencode-mem-调研与上手指南]]。

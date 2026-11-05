@@ -60,6 +60,10 @@ updated: 2026-08-14
 - 正式学习路线以 `dsh-learn` 仓库 `AGENTS.md` 为准（Cordis 实验起步，实践优先）
 - 后续实践笔记（07+）将随动手进度回到 `learning/dsh/` 补写
 
+**🧠 OpenCode 记忆插件**
+1. [[opencode-mem-调研与上手指南]](opencode-mem 的检索、冲突与迭代、安装配置)
+2. [[opencode-mem-值得调整的配置]](装好后哪些配置值得调,按优先级排序)
+
 **🗂️ Obsidian（工具）**
 1. [[Obsidian 命令与技能完全指南]] — Obsidian 命令体系 + claude-obsidian 14 个 AI 技能
 

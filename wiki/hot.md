@@ -1,12 +1,16 @@
 ---
 type: meta
 title: "Hot Cache"
-updated: 2026-06-01T22:30:00
+updated: 2026-11-05
 ---
 
 # 最近上下文 (Hot Cache)
 
 ## 最近更新
+2026-11-05。另新增 [[opencode-mem-值得调整的配置]](必改:opencodeProvider/Model;嵌入模型已定 Xenova/bge-m3(默认 nomic 对非英文疑似不佳,存第一批记忆前定好);重要记忆置顶/调保留天数)。
+2026-11-05。新增学习笔记 [[opencode-mem-调研与上手指南]](opencode-mem 检索、冲突与迭代、安装配置;默认配置基本不处理知识冲突,需手动开 updateOnCapture/dreaming;默认 30 天未更新会被清理,重要记忆要置顶)。
+
+(以下为此前记录)
 2026-06-01。完成首次 autoresearch:研究主题"大模型微调",归档 9 个新页面。
 
 ## 关键近期事实

@@ -1,12 +1,35 @@
 ---
 type: meta
 title: "Log"
-updated: 2026-09-14
+updated: 2026-11-05
 ---
 
 # 操作日志 (Log)
 
 仅追加。新条目放在最上方。永不修改历史条目。
+
+---
+
+## [2026-11-05] update | opencode-mem 嵌入模型改为 bge-m3
+- 发现默认 nomic-embed-text-v1 官方页未写多语言支持,外部来源称主要为英文;README 的"多语言"说法存疑。
+- 决定用 `Xenova/bge-m3`(1024 维),去掉 `embeddingUseTaskPrefixes`。更新 [[opencode-mem-值得调整的配置]]、[[opencode-mem-调研与上手指南]]。
+- 未验证:中文召回的实际效果、模型首次下载。
+
+
+## 2026-11-05 — learning | opencode-mem 值得调整的配置
+
+- 新建 `learning/opencode/opencode-mem/opencode-mem-值得调整的配置.md`
+- 依据 v2.41.0 的 example.jsonc、config.ts 默认值、README;按"必须改/建议改/看情况/不用管"分级,附推荐起步配置与验证方法
+- 未验证:codebuddy 自定义 provider 能否做后台捕获、中文场景下相似度门槛取值
+
+---
+
+## 2026-11-05 — learning | opencode-mem 调研与上手指南
+
+- 新建 `learning/opencode/opencode-mem/opencode-mem-调研与上手指南.md`
+- 内容:OpenCode 记忆插件分类与星标、opencode-mem 对比 supermemory、检索与混合排序(0.5/0.3/0.2)、知识冲突与迭代(去重/保存时更新/dreaming/清理/画像)、安装部署、学习路线
+- 依据 v2.41.0 源码与 README 整理;`flag` 矛盾标记的可见性、codebuddy provider 的适用性标为未确认
+- 更新 index.md 学习区
 
 ---
 

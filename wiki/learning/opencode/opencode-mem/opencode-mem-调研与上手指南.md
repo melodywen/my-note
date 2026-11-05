@@ -343,7 +343,7 @@ OpenCode v2 里字段名是 `plugins`(v1 是 `plugin`)。你现有的是:
 | 定期整理 | `dreaming.enabled: true`,同时要配好 provider |
 | 加强隐私 | `databaseEncryptionEnabled`(数据库加密) |
 | 给网页界面加密码 | HTTP Basic Auth |
-| 让记忆变成可读文件 | `memoryBackend` 选 markdown vault |
+| 让记忆变成可读文件 | `memoryBackend` 选 markdown vault(**v2.41.0 本机实测会让网页崩溃,不建议开**,详见《值得调整的配置》第 12 节) |
 | 多个仓库共享一份项目记忆 | 在仓库根放 `.opencode-mem-project` |
 | 减少注入量 | 调小 `chatMessage.maxMemories` |
 | 调整召回松紧 | 调 `chatMessage.similarityThreshold`(默认 0.6,中英混用时需要观察) |

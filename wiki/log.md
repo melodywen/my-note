@@ -10,6 +10,11 @@ updated: 2026-11-05
 
 ---
 
+## [2026-11-05] update | opencode-mem 关闭 markdown 后端
+- 根因:markdown 后端每次启动全量扫描 md,按 md 重写数据库;md 文件头无 `promptId`,重写时把它抹掉,网页配不上记忆与提问,报 `each_key_duplicate` 崩溃。实测 37 条缺 `promptId` 的记忆全带 `markdownContentHash`,2 条最新的有 `promptId` 且全无该标记。
+- 决定:去掉 `memoryBackend`/`markdownPath`,回到默认 `database`;不再使用 `opencode-mem-vault` 仓库。更新 [[opencode-mem-值得调整的配置]](第 12 节、"看情况"表、JSON 示例)、[[opencode-mem-调研与上手指南]]。
+- 未验证:关闭后已丢 `promptId` 的老记忆不会恢复,需删除或等上游修复;重启后效果待核对。
+
 ## [2026-11-05] update | opencode-mem 嵌入模型改为 bge-m3
 - 发现默认 nomic-embed-text-v1 官方页未写多语言支持,外部来源称主要为英文;README 的"多语言"说法存疑。
 - 决定用 `Xenova/bge-m3`(1024 维),去掉 `embeddingUseTaskPrefixes`。更新 [[opencode-mem-值得调整的配置]]、[[opencode-mem-调研与上手指南]]。

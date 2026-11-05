@@ -216,7 +216,7 @@ related:
 
 `autoCaptureLanguage` 默认 `"auto"` 自动检测。如果发现中文对话被存成英文摘要(或相反),可以固定为 `"zh"` 或 `"en"`。
 
-### 12. 想把记忆当文档管理
+### 12. 想把记忆当文档管理(v2.41.0 实测有 bug,本机已关)
 
 ```jsonc
 "memoryBackend": "markdown",
@@ -224,6 +224,14 @@ related:
 ```
 
 记忆变成一个个 `.md` 文件,数据库只当可重建的搜索索引。方便用 Obsidian 查看和编辑。
+
+> [!bug] 本机实测:开了会让网页崩溃,已关闭
+> - 每次服务启动,插件把 md 文件全量扫描一遍,凡是和数据库对不上的记忆,按 md 重写。
+> - md 文件头只有 8 项(`id/type/tags/containerTag/createdAt/updatedAt/source/title`),**没有 `promptId`**(`document.ts` 的 `packMemoryMarkdown`)。重写时元数据只用 md 里有的拼(`reconcile.ts:143`),`promptId`、`sessionID`、`captureTimestamp` 就被抹掉。
+> - 网页靠 `promptId` 把记忆和提问配对。配不上会产生重复 key,报 `each_key_duplicate`,页面卡在 "Initializing…",翻到相关那页就崩。
+> - 实测:37 条缺 `promptId` 的记忆全都带 `markdownContentHash`(被重写过),2 条有 `promptId` 的最新记忆全都没有,没有例外。
+> - 记忆内容、检索、注入不受影响,坏的只是网页显示。
+> - 结论:**v2.41.0 不要开 markdown 后端**,除非不用网页。
 
 > [!warning] 切换会丢数据
 > 切到 markdown 时,数据库里没有对应文件的行会被丢弃。切之前先用 `memory export` 导出。
@@ -326,8 +334,8 @@ related:
 | `autoCaptureLanguage` | 用默认 `"auto"`,不写 | 发现摘要语言不对再固定 `"zh"` |
 | `autoUpdate` | 用默认 `true`,不写 | 想稳定再写 `false` 或固定版本号 |
 | `showUserProfileToasts` | 用默认 `true`,不写 | 保持弹出,方便知道画像何时更新 |
-| `databaseEncryptionEnabled` | 用默认 `false`,不写 | 已开 markdown 模式,md 文件是明文,加密意义有限 |
-| `memoryBackend` + `markdownPath` | `"markdown"` + 专门的新文件夹 | 想让记忆变成 md 文件;**不要指到 `my-note/wiki`** |
+| `databaseEncryptionEnabled` | 用默认 `false`,不写 | 想加密落盘数据再开 |
+| `memoryBackend` + `markdownPath` | **不写,用默认 `"database"`** | v2.41.0 的 markdown 后端会在重启时抹掉 `promptId`,导致网页崩溃(见第 12 节) |
 | `memory.defaultScope` | `"all-projects"` | 想跨项目查记忆才改 |
 
 ### 不要改(默认已经正确)
@@ -347,10 +355,9 @@ related:
   // ===== 存第一批记忆之前就要定 =====
   "embeddingModel": "Xenova/bge-m3",      // 1024 维,多语言;不要同时写 embeddingUseTaskPrefixes
 
-  // ===== 想在界面和文件里看到记忆 =====
+  // ===== 想在界面里看到记忆 =====
   "webServerEnabled": true,               // 网页界面,默认已开;访问 http://127.0.0.1:4747
-  "memoryBackend": "markdown",            // 记忆变成 md 文件,数据库只当可重建的检索索引
-  "markdownPath": "~/ai-work/opencode-mem-vault",  // 专门的新文件夹,不要指到 my-note/wiki
+  // 不要写 memoryBackend: "markdown"。v2.41.0 里重启会抹掉 promptId,网页会崩(见第 12 节)
 
   // ===== 成本和资源 =====
   "embeddingIdleTimeoutMs": 600000,

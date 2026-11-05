@@ -7,6 +7,7 @@ updated: 2026-11-05
 # 最近上下文 (Hot Cache)
 
 ## 最近更新
+2026-11-05。opencode-mem 已关闭 markdown 后端(v2.41.0 重启会抹掉 `promptId`,网页崩溃),见 [[opencode-mem-值得调整的配置]] 第 12 节;`opencode-mem-vault` 仓库不再使用。
 2026-11-05。另新增 [[opencode-mem-值得调整的配置]](必改:opencodeProvider/Model;嵌入模型已定 Xenova/bge-m3(默认 nomic 对非英文疑似不佳,存第一批记忆前定好);重要记忆置顶/调保留天数)。
 2026-11-05。新增学习笔记 [[opencode-mem-调研与上手指南]](opencode-mem 检索、冲突与迭代、安装配置;默认配置基本不处理知识冲突,需手动开 updateOnCapture/dreaming;默认 30 天未更新会被清理,重要记忆要置顶)。
 

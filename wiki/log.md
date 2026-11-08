@@ -10,6 +10,13 @@ updated: 2026-11-08
 
 ---
 
+## 2026-11-08 — claude-mem 本地多语言向量方案(隔离实测)
+
+- 实测 `EMBEDDING_MODEL` 改任何值都不报错也不生效;`CHROMA_EMBEDDING_FUNCTION` 改成非白名单值,运行中无反应,重启后全项目回填报错;还原后回填自动补齐,无数据丢失
+- 实测 `DELETE /api/observation/:id` 会同步清 SQLite 与 Chroma 向量(测试观察 #190、#200)
+- 隔离副本验证 Ollama + bge-m3 经 `openai` 嵌入函数与 `~/.chroma_env` 接入,整库重建成功;中文 6 条查询 5/6 对 1/6,经核查未命中的一条是标准答案划窄
+- 新增:[[claude-mem-本地多语言向量方案]];真实环境尚未改动
+
 ## 2026-11-08 — claude-mem 第 4、5 轮调教
 
 - 第 4 轮(注入):逐键实测注入长度,默认约 5000 字符;`FULL_COUNT` 用 `facts` 反而更长,`MEMORY_INSTRUCTIONS_ENABLED` 在 OpenCode 下无效,`OBSERVATION_TYPES` 过滤反而变长。结论:不改任何键

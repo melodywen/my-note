@@ -8,6 +8,7 @@ updated: 2026-11-08
 
 ## 最近更新
 
+2026-11-08。新增 [[claude-mem-本地多语言向量方案]]:`EMBEDDING_MODEL` 在本机路径无效且不报错;`CHROMA_EMBEDDING_FUNCTION` 填白名单外的值重启才报错;可借 `openai` 函数加 `~/.chroma_env`(chroma-mcp 自带读取)指向本机 Ollama 的 bge-m3,在 /tmp 隔离副本里整库重建成功(1024 维),6 条中文查询命中 5/6 对 1/6,但标准答案偏窄、样本小,真实环境尚未上线。
 2026-11-08。claude-mem 第 4、5 轮调教完成:第 4 轮(注入)实测后一个键都不改,默认注入约 5000 字符;第 5 轮把 `SEARCH_RECENCY_DAYS` 改为 0(构造数据实测:窗口外的精确命中在"近期有不相干向量命中"时会被漏掉)。中文召回无配置层解法。claude-mem 无冲突推翻和 dream 整理能力,只有 `DELETE /api/observation/:id` 与 `save_memory`。
 2026-11-08。claude-mem 已接通公司网关并实测:观察者走 openai-compatible(模型 deepseek-v4.1-flash),中文模式 code--zh 生效;第 2 轮隐私(脱敏)与第 3 轮采集已配。实测发现:默认向量模型中文问英文记忆基本垫底;`SKIP_BASH_PATTERNS` 与子代理过滤在 OpenCode 下无效,只有 `SKIP_TOOLS` 能用。四篇文档已按实测订正。
 2026-11-08。claude-mem 已装机(OpenCode 插件自动加载生效,worker 在 37701),新增 [[claude-mem-网页后台使用指南]]:`/viewer` 是记忆查看器,"30 天试用"只是 CMEM Pro 推广位;观察者仍因没配 codebuddy 不工作(观察 0、积压 11),待补地址和模型名;配置仓库已推 `a031a21`,`plugins/claude-mem.js` 已 gitignore。

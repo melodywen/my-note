@@ -17,6 +17,7 @@ related:
   - "[[claude-mem-调教清单]]"
   - "[[claude-mem-跨端共享]]"
   - "[[claude-mem-深入调研]]"
+  - "[[claude-mem-本地多语言向量方案]]"
 ---
 
 # claude-mem 存储与读取机制
@@ -233,7 +234,7 @@ Chroma 用一次"全类型取前 N"的查询,所以某一类可能被别的类�
 | 搜索时直接给日期范围 | 传 `dateStart/dateEnd`,窗口不再生效 | 源码:ChromaSearchStrategy.ts 约 221-230 行 | 同上 |
 | 完全关掉 Chroma,只用 SQLite | `CLAUDE_MEM_CHROMA_ENABLED=false` | 源码:DatabaseManager.ts 约 93 行;SearchOrchestrator.ts 约 147-152 行 | 中文变成纯子串匹配(稳定、按时间排),但英文也失去"按意思找"。哪个更适合你,没测过(未证实) |
 | 换 Chroma 的嵌入函数 | `CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION` 可选 `openai/cohere/jina/voyageai/roboflow`,只对新集合生效、要重建索引,记忆文字会发给厂商、需要 API key | 源码注释:SettingsDefaultsManager.ts 约 669-675 行 | 这些模型对中文是否更好:推断(云端通用模型通常多语言),**未证实**;而且有隐私成本 |
-| 换成多语言嵌入模型 | 只改配置做不到。`CLAUDE_MEM_EMBEDDING_MODEL`(可选 `paraphrase-multilingual-MiniLM-L12-v2`、`multilingual-e5-small`、`granite-embedding-97m-multilingual-r2`,models.ts 约 37-80 行白名单,未知名字会报错,约 85-93 行)仅服务器模式生效;本机 worker 的 Chroma 路径读 `CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION`,白名单只有 `default/openai/cohere/jina/voyageai/roboflow`,没有本地多语言模型 | 源码 | 如要在本机用多语言本地模型,需要改源码(把 `LocalEmbedder` 接到 `ChromaSync`)。这一条是推断,**未实现、未实测**。源码称三个多语言候选在外部项目 `rich-murphey/claude-mem-search-eval` 里测过,我没读,结论未证实 |
+| 换成多语言嵌入模型 | **配置层直接换做不到,但可以绕**:`CLAUDE_MEM_EMBEDDING_MODEL` 在本机 worker 的 Chroma 路径**改任何值(包括不存在的名字)都不报错也不生效**,只被服务器模式(Postgres)读取;本机真正读的是 `CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION`,白名单只有 `default/openai/cohere/jina/voyageai/roboflow`(填白名单外的值运行中不报错,**重启 worker 后才报错、全项目回填失败**)。可借 `openai` 这一项指向本机 Ollama(`bge-m3`,经 `~/.chroma_env`),不改源码、数据不出本机,已在本机上线 | 实测;原理与步骤见 [[claude-mem-本地多语言向量方案]] | 效果:中问中从基本不可用变成勉强可用,英问中没变好,**只是及格不是达标**,详见该文 5.3 节 |
 | 让观察用中文写(模式 `code--zh`) | 设 `CLAUDE_MEM_MODE=code--zh` 后重启 worker | 实测,见下 | 新观察的标题、叙述、副标题是中文;这对"中文问中文"有帮助的程度未单独测。对切换前的旧记忆无效 |
 | 换检索工具 | 例如 memsearch | 无 | 备选方向,未评估 |
 
@@ -248,6 +249,8 @@ Chroma 用一次"全类型取前 N"的查询,所以某一类可能被别的类�
 - 观察者可能误读:曾有一条记忆(观察 12)写"总结仍为英文",原因是它看的是切换前的旧总结。这类误读一旦写入就长期留在记忆里。
 
 ### 6.3 实测:中文召回
+
+> 订正:本节是**换模型之前**(默认 MiniLM)的 12 条小样本。2026-11-08 已换成本地 bge-m3,换后的 30 条手工标准答案验收见 [[claude-mem-本地多语言向量方案]] 5.3 节:中问中勉强可用,英问中没变好。
 
 环境:claude-mem v15.12.0,OpenCode 插件,worker 端口 37701,本机 Chroma(local 模式),默认嵌入函数 `default`(all-MiniLM-L6-v2,偏英文)。测试时库里有 29 条观察,其中 21 条标题含中文;向量库共 275 个文档,提问原文占多数。
 

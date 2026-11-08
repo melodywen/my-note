@@ -7,6 +7,8 @@ updated: 2026-11-08
 # 最近上下文 (Hot Cache)
 
 ## 最近更新
+
+2026-11-08。claude-mem 已接通公司网关并实测:观察者走 openai-compatible(模型 deepseek-v4.1-flash),中文模式 code--zh 生效;第 2 轮隐私(脱敏)与第 3 轮采集已配。实测发现:默认向量模型中文问英文记忆基本垫底;`SKIP_BASH_PATTERNS` 与子代理过滤在 OpenCode 下无效,只有 `SKIP_TOOLS` 能用。四篇文档已按实测订正。
 2026-11-08。claude-mem 已装机(OpenCode 插件自动加载生效,worker 在 37701),新增 [[claude-mem-网页后台使用指南]]:`/viewer` 是记忆查看器,"30 天试用"只是 CMEM Pro 推广位;观察者仍因没配 codebuddy 不工作(观察 0、积压 11),待补地址和模型名;配置仓库已推 `a031a21`,`plugins/claude-mem.js` 已 gitignore。
 2026-11-08。claude-mem 五篇文档齐了(新增 [[claude-mem-存储与读取机制]]、[[claude-mem-跨端共享]]);订正:`--provider host` 要本机已有兼容服务、安装器不起,对 OpenCode/DSH 大概率不可用,首次安装改用 `claude`;DSH 有官方集成,写入来源名按源码推为 `dsh`;均未实测,下一步是装机实测与 codebuddy 地址。
 2026-11-08。opencode-mem 已从本机卸载(插件配置、数据目录、缓存全删,未备份);记忆方案改看 claude-mem / memsearch。

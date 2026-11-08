@@ -129,7 +129,9 @@ related:
 | 备份(Backups) | 数据库自动快照开关、上次备份状态 | 改完要**重启 worker** 才生效。恢复命令界面里给了:`npx claude-mem restore <文件>` |
 | 高级(Advanced) | **AI 提供方和模型选择**,观察者就是在这里换 | `CLAUDE_MEM_PROVIDER` 等 |
 
-### 4.3 在这里把观察者换成 codebuddy
+### 4.3 在这里把观察者换成 codebuddy(实际走公司网关)
+
+codebuddy 不在预设里,而且实际也**没有直连 codebuddy**,而是走公司网关(网关自己持有并刷新 codebuddy 凭证,调用方只发固定的 Bearer key)。不直连的原因:codebuddy 用浏览器 OAuth、token 会过期、每次请求带约 25 个租户/用户头,而 claude-mem 只发 `Authorization: Bearer <key>`(这是推断,直连未实测)。
 
 高级分区里"AI 提供方"下拉有:
 
@@ -143,16 +145,16 @@ related:
 
 | 输入 | 填什么 |
 |---|---|
-| 端点预设(Endpoint preset) | 下拉里有 NVIDIA NIM、DeepSeek、Groq、Together、MiniMax、Ollama、LM Studio、vLLM 等 20 项。**codebuddy 不在里面,选"自定义 OpenAI 兼容端点(custom)"** |
-| Base URL | codebuddy 的 OpenAI 兼容地址(**我们还缺**) |
-| Model | 模型名(**我们还缺**) |
+| 端点预设(Endpoint preset) | 下拉里有 NVIDIA NIM、DeepSeek、Groq、Together、MiniMax、Ollama、LM Studio、vLLM 等 20 项。**codebuddy 和公司网关都不在里面,选"自定义 OpenAI 兼容端点(custom)"** |
+| Base URL | 填网关地址:`https://mapecology.testsite.woa.com/api/ecology/openai/v1`(域名含 `testsite`,是测试环境) |
+| Model | 填 `deepseek-v4.1-flash` |
 | Reasoning | 关(默认)或开(由端点决定) |
 
 **API key 不能在网页里填。** 界面上直接写了:"API key 在网页外设置:`~/.claude-mem/settings.json` 里的 `CLAUDE_MEM_OPENAI_COMPAT_API_KEY`,或 `~/.claude-mem/.env` 里的 `OPENAI_COMPAT_API_KEY`。本地服务器不需要。"
 
-这对我们是好消息:**密钥可以放 `.env`,不用写进已入库的 `settings.json`**。但 `.env` 是否真的优先读,界面这句话只说"可以设",我没验证。
+我们的做法:**密钥放 `~/.claude-mem/.env` 的 `OPENAI_COMPAT_API_KEY`,不写进 `settings.json`**。实测 worker 能读到 `.env` 里的 key(已证实)。
 
-另外,本地服务不需要 key(Ollama 等)这条,对 codebuddy 不适用,它要 key。
+另外,本地服务不需要 key(Ollama 等)这条,对网关不适用,它要 key:无 key 实测返回 401 `invalid_api_key`。
 
 ### 4.4 保存
 
@@ -188,23 +190,30 @@ npx claude-mem restart
 
 ## 6. 现在这个后台里能看到什么(实测快照)
 
-2026-11-08 15:40 左右的实测:
+两次快照,2026-11-08:接通前约 15:40,接通后约 16:25 到 16:30(此时观察者已接公司网关)。
 
-| 项 | 值 | 来源 |
-|---|---|---|
-| 观察(observations) | 0 | [/api/stats](http://127.0.0.1:37701/api/stats) 和直接查库 |
-| 总结 | 0 | 同上 |
-| 会话 | 1 | 同上 |
-| 你的提问原文 | 13 | 直接查 `user_prompts` 表 |
-| 项目 | `my-note` | [/api/projects](http://127.0.0.1:37701/api/projects) |
-| 来源 | `opencode` | [/api/projects](http://127.0.0.1:37701/api/projects) |
-| 队列积压 | 11 | [/api/processing-status](http://127.0.0.1:37701/api/processing-status) |
+| 项 | 接通前 | 接通后 | 来源 |
+|---|---|---|---|
+| 观察(observations) | 0 | 25 到 31(随对话增长) | [/api/stats](http://127.0.0.1:37701/api/stats) 和直接查库 |
+| 总结 | 0 | 4 以上 | 同上 |
+| 会话 | 1 | 未记录 | 同上 |
+| 你的提问原文 | 13 | 未记录 | 直接查 `user_prompts` 表 |
+| 项目 | `my-note` | 未重测 | [/api/projects](http://127.0.0.1:37701/api/projects) |
+| 来源 | `opencode` | 未重测 | [/api/projects](http://127.0.0.1:37701/api/projects) |
+| 队列积压 | 11 | 0 | [/api/processing-status](http://127.0.0.1:37701/api/processing-status) |
+| 观察者状态 | 不工作 | `ai.lastInteraction.success=true`,`provider=openai-compatible` | [/api/health](http://127.0.0.1:37701/api/health) |
 
 **这组数字说明什么**:
 
-1. OpenCode 插件在工作:来源 `opencode` 已登记,你的提问被原文记录。这同时证明 **`claude-mem.js` 被 OpenCode 自动加载了**,之前我没验证过的点现在有证据。
-2. 观察者没工作:观察 0 条、队列积压 11 条且没被消费。原因我们已知,找不到 `claude` 可执行文件,没配好 codebuddy。
-3. 积压的 11 条,等观察者配好后会不会被补处理,我没验证。
+1. OpenCode 插件在工作:来源 `opencode` 已登记,你的提问被原文记录。这同时证明 **`claude-mem.js` 被 OpenCode 自动加载了**。
+2. 接通前观察者没工作:观察 0 条、队列积压 11 条且没被消费。原因是当时找不到 `claude` 可执行文件,没配好观察者。
+3. 接通后观察者正常:观察和总结开始增长,积压归零。
+4. 接通前积压的 11 条,配好后**被丢弃,没有补处理**(已证实)。
+
+另外两个不影响记忆读写的现象:
+
+- tree-sitter 下载校验失败(拿到空文件),导致 `smart_search` 等三个代码解析工具不可用。
+- 设备 ID(`CLOUD_SYNC_DEVICE_ID`)不是云同步开关:首次启动生成,重启不变。云同步是否关闭看 `CLOUD_SYNC_HUB_URL` 是否为空;日志里 `sync.cmem.ai` 出现 0 次。
 
 ## 7. 关于"免费试用 30 天"
 
@@ -228,7 +237,7 @@ npx claude-mem restart
 | 观察者坏了查原因 | 日志抽屉,或 [/api/health](http://127.0.0.1:37701/api/health) | 级别选 Error,看 `dependencies` 里的 `claude_cli` 之类的提示 |
 | 调一次注入多少记忆 | 齿轮、加载分区 | 先看"已保存上下文预览"确认效果,再保存 |
 | 删一条不想要的记忆 | 时间线卡片右上角 | 点删除并确认,**不可撤销** |
-| 换观察者的模型 | 齿轮、高级分区 | 提供方选 OpenAI 兼容,预设选 custom,填地址和模型,key 放 `.env` 或 `settings.json` |
+| 换观察者的模型 | 齿轮、高级分区 | 提供方选 OpenAI 兼容,预设选 custom,Base URL 填公司网关地址,Model 填模型名(现用 `deepseek-v4.1-flash`);key 不能在网页填,放 `~/.claude-mem/.env` 的 `OPENAI_COMPAT_API_KEY`。改完重启 worker |
 
 ## 9. 没证实的清单
 
@@ -236,10 +245,18 @@ npx claude-mem restart
 - "N 条记忆"到底怎么数,没读计数函数。
 - 保存设置后哪些键要重启 worker,只有备份确认。
 - 网页保存是否保持 `settings.json` 软链,没实测。
-- `.env` 里的 `OPENAI_COMPAT_API_KEY` 是否优先读,界面只说"可以设"。
-- 观察者配好后,已积压的 11 条会不会被补处理。
 - 推广位能不能关。
 - `/tv` 页面做什么。
+- 直连 codebuddy 是否真的行不通:只是推断,没实测。
+- 公司网关(域名含 `testsite`,测试环境)的长期稳定性和额度限制。
+- 发给网关的请求包是否已脱敏:没抓包,只从调用点推断。
+- 裸 key(前后无变量名或 `Bearer`、无厂商前缀)不会被脱敏,实测漏过;库和日志里搜不到网关 key 明文,但原因没完全查清。
+- 脱敏开启前产生的旧记忆不会被回头脱敏。
+
+已证实、从清单移出:
+
+- `.env` 里的 `OPENAI_COMPAT_API_KEY` 会被 worker 读到。
+- 观察者配好后,接通前积压的 11 条被丢弃,没有补处理。
 
 ## 10. 下一步
 

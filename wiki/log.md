@@ -10,6 +10,15 @@ updated: 2026-11-08
 
 ---
 
+## 2026-11-08 — claude-mem 接通公司网关并实测,文档按实测订正
+
+- 观察者接通:provider 为 openai-compatible,走公司网关(测试环境域名),模型 deepseek-v4.1-flash;密钥放 `.env`,`settings.json` 与 `.env` 真文件在配置仓库、软链回 `~/.claude-mem/`
+- 实测:中文模式 code--zh 生效;脱敏单元 13 用例与端到端扫描 38 张表明文残留 0,裸 key 会漏;中文问英文记忆排名基本垫底(样本小,仅作方向)
+- 第 3 轮采集实测:`SKIP_TOOLS` 有效,`SKIP_BASH_PATTERNS` 与子代理过滤在 OpenCode 下无效(工具名小写、插件不上报 agent 字段);依据 OpenCode 库内 26763 次调用统计
+- 订正 4 篇文档:[[claude-mem-安装部署]]、[[claude-mem-调教清单]]、[[claude-mem-存储与读取机制]]、[[claude-mem-网页后台使用指南]]
+
+---
+
 ## [2026-11-08] create | claude-mem 网页后台使用指南,并记录装机实测
 
 新增 [[claude-mem-网页后台使用指南]]。来自 `src/ui/viewer/` 前端源码和本机接口:`/viewer` 才是记忆查看器,`/` 是 My Work 看板;齿轮设置与 `settings.json` 同源,OpenAI 兼容端点的 key 不能在网页填,只能放 `settings.json` 或 `.env`;"免费试用 30 天"是 CMEM Pro 推广位,本地版 Apache-2.0 无时限。装机实测:OpenCode 插件被自动加载(来源 `opencode` 已登记,提问原文 13 条入库);观察 0 条、队列积压 11,观察者因找不到 `claude` 未工作;"N 条记忆"疑似把提问也计入,未读计数函数。界面渲染、保存是否保持软链、`.env` 优先级均未实测。

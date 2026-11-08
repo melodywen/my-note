@@ -24,7 +24,9 @@ related:
 
 > 一句话:**238 个键里真正值得调的只有 40 个左右。这篇把它们按"先后顺序"分成 8 轮,每轮只动几个键,改完有验证方法,不满意有回退值。**
 >
-> 全表看 [[claude-mem-配置详解]]。本篇的默认值和行为都来自读源码(约 v15.12.0),**没有实测**;标"推断"的是我根据调用路径推的。
+> 全表看 [[claude-mem-配置详解]]。本篇的默认值和行为来自读源码(约 v15.12.0);第 1、2、3 轮已在本机配置并实测,结果写在各轮的"实测结果"里,其余轮次仍是读源码的结论,标"推断"的是我根据调用路径推的。
+
+> 关于注释:`settings.json` 是严格 JSON 解析,**不能写注释**。键的说明放在配置仓库的 `claude-mem/settings.example.jsonc`(带行内注释的示例文件,与真实 `settings.json` 的键一一对应),改键时对照它看。
 
 ---
 
@@ -54,17 +56,17 @@ npx claude-mem restart
 
 ### 8 轮总览
 
-| 轮 | 目标 | 键数 | 优先级 |
-|---|---|---|---|
-| 第 0 轮 | 先别动,记下"出厂状态" | 0 | 必做 |
-| 第 1 轮 | 观察者:接上 codebuddy、中文输出 | 6 | 必改 |
-| 第 2 轮 | 隐私:不泄密、不外发、不存图 | 7 | 必改 |
-| 第 3 轮 | 采集:什么该记、什么不该记 | 6 | 建议 |
-| 第 4 轮 | 注入:开会话时塞多少旧记忆 | 6 | 建议 |
-| 第 5 轮 | 检索:中文召回与 90 天窗口 | 4 | 建议 |
-| 第 6 轮 | 跨端:OpenCode 与 DSH 共用 | 3 | 必改(若要共用) |
-| 第 7 轮 | 运维:备份、日志、清理 | 6 | 可选 |
-| 附 | 先别碰的键 | | 观察 |
+| 轮 | 目标 | 键数 | 优先级 | 状态 |
+|---|---|---|---|---|
+| 第 0 轮 | 先别动,记下"出厂状态" | 0 | 必做 | 已做 |
+| 第 1 轮 | 观察者:接上 codebuddy(经公司网关)、中文输出 | 6 | 必改 | 已做,实测通过 |
+| 第 2 轮 | 隐私:不泄密、不外发、不存图 | 7 | 必改 | 已做,脱敏已验证 |
+| 第 3 轮 | 采集:什么该记、什么不该记 | 6 | 建议 | 已做,仅 SKIP_TOOLS 有效,其余 5 键在 OpenCode 下无效或暂不需要 |
+| 第 4 轮 | 注入:开会话时塞多少旧记忆 | 6 | 建议 | 未做 |
+| 第 5 轮 | 检索:中文召回与 90 天窗口 | 4 | 建议 | 未做 |
+| 第 6 轮 | 跨端:OpenCode 与 DSH 共用 | 3 | 必改(若要共用) | 未做 |
+| 第 7 轮 | 运维:备份、日志、清理 | 6 | 可选 | 未做 |
+| 附 | 先别碰的键 | | 观察 | 未做 |
 
 ---
 
@@ -109,23 +111,33 @@ npx claude-mem doctor     # 自检:bun、uv、hook、worker 是否正常
 | 键(省略 `CLAUDE_MEM_` 前缀)   | 默认       | 改成                      | 说明                                                                                                  |
 | ------------------------ | -------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
 | `PROVIDER`               | `claude` | `openai-compatible`     | 独立的提供方,不带 OpenRouter 归因头,key 独立;有效值只有 `claude`/`codex`/`gemini`/`openrouter`/`openai-compatible` 五个 |
-| `OPENAI_COMPAT_BASE_URL` | 空        | codebuddy 的 OpenAI 兼容地址 | 留空且不选预设,就不连任何地方,只报"未配置端点"。**codebuddy 的真实地址我不知道**,得你提供                                              |
-| `OPENAI_COMPAT_API_KEY`  | 空        | codebuddy 的 Key         | 和 OpenRouter 的 key 分开存放                                                                             |
-| `OPENAI_COMPAT_MODEL`    | 空        | 便宜的模型名                  | 原样传给接口。自定义地址没有默认模型,留空会报 `No model configured`。每次工具调用都要调一次,选便宜、快的                                    |
-| `MODE`                   | `code`   | `code--zh`              | 指向 `plugin/modes/code--zh.json`,观察笔记用中文写。文件不存在会报错                                                   |
-| `OPENAI_COMPAT_PRESET`   | 空        | **保持为空**                | 预设是自动填默认地址的快捷方式(deepseek、groq、ollama 等);接 codebuddy 手填地址,所以留空                                       |
+| `OPENAI_COMPAT_BASE_URL` | 空        | `https://mapecology.testsite.woa.com/api/ecology/openai/v1`(公司网关) | 实际**没有直连 codebuddy**,走公司网关。网关持有并刷新 codebuddy 凭证,调用方只发固定的 Bearer key。域名含 `testsite`,是测试环境(稳定性未知) |
+| `OPENAI_COMPAT_API_KEY`  | 空        | **不写进 settings.json** | 放 `~/.claude-mem/.env` 的 `OPENAI_COMPAT_API_KEY`。和 OpenRouter 的 key 分开存放 |
+| `OPENAI_COMPAT_MODEL`    | 空        | `deepseek-v4.1-flash`   | 原样传给接口。自定义地址没有默认模型,留空会报 `No model configured`。每次工具调用都要调一次,选便宜、快的 |
+| `MODE`                   | `code`   | `code--zh`              | 指向 `plugin/modes/code--zh.json`,观察笔记正文用中文写。文件不存在会报错                                                   |
+| `OPENAI_COMPAT_PRESET`   | 空        | `custom`                | 预设是自动填默认地址的快捷方式(deepseek、groq、ollama 等);网关不在预设里,选 `custom` 后手填地址和模型 |
 
-### 最小可用 JSON
+### 为什么走网关而不直连 codebuddy
+
+| 项 | 情况 |
+|---|---|
+| codebuddy 直连 | 用浏览器 OAuth,token 会过期,每次请求带约 25 个租户/用户头 |
+| claude-mem 能发的 | 只有 `Authorization: Bearer <key>` |
+| 结论 | 直连大概率对不上(**推断,直连未实测**),所以改走公司网关 |
+
+### 实际使用的最小 JSON(5 个键,不含 key)
 
 ```json
 {
   "CLAUDE_MEM_PROVIDER": "openai-compatible",
-  "CLAUDE_MEM_OPENAI_COMPAT_BASE_URL": "<codebuddy 的 OpenAI 兼容地址>",
-  "CLAUDE_MEM_OPENAI_COMPAT_API_KEY": "<codebuddy 的 Key>",
-  "CLAUDE_MEM_OPENAI_COMPAT_MODEL": "<便宜的模型名>",
+  "CLAUDE_MEM_OPENAI_COMPAT_PRESET": "custom",
+  "CLAUDE_MEM_OPENAI_COMPAT_BASE_URL": "https://mapecology.testsite.woa.com/api/ecology/openai/v1",
+  "CLAUDE_MEM_OPENAI_COMPAT_MODEL": "deepseek-v4.1-flash",
   "CLAUDE_MEM_MODE": "code--zh"
 }
 ```
+
+密钥写在 `~/.claude-mem/.env`,格式为一行 `OPENAI_COMPAT_API_KEY=<key>`(此处不写真值)。`settings.json` 和 `.env` 的真文件都在 `~/.config/opencode/claude-mem/`,软链回 `~/.claude-mem/`。该配置仓库是私有的,`.env` 一并入库(已与用户确认)。
 
 注意:整份 `settings.json` 里还有另外 233 个键,上面只是要**改动**的 5 个值,不是整个文件。改的时候在原文件里找到这几个键改值,别把文件替换成这 5 行(缺键会用默认值兜底,但不要依赖这一点去删别的键)。
 
@@ -152,13 +164,31 @@ npx claude-mem doctor     # 自检:bun、uv、hook、worker 是否正常
 lsof -i -P | grep -i cmem
 ```
 
+实测到的结论(2026-11-08):
+
+- 接通后观察者能正常产出,`/api/health` 里 `ai.lastInteraction.success=true`、`provider=openai-compatible`。
+- 网关调用实测:不带 key 返回 401 `invalid_api_key`;请求不带 `stream` 返回 400(上游只收流式);`stream:true` 返回 200,约 1.3 秒。
+- `.env` 里的 key 会被 worker 读到。
+- 接通前积压的 11 条队列被丢弃,没有补处理。
+- `MODE=code--zh` 只让观察正文变中文,`facts` 字段仍夹带不少英文,会话总结(session_summaries)也仍是英文。
+
 ### 回退
 
 `PROVIDER` 改回 `claude`(需本机有 Claude 登录)。不要回退到 `host`:它要求本机已有一个兼容服务,安装器不会替你起,对 OpenCode 与 DSH 大概率不可用(见 [[claude-mem-安装部署]] 2.4 节)。
 
-### 没实测
+### 实测结果
 
-codebuddy 能否被 `openai-compatible` 调通、笔记质量如何、有无额度限制,都没实测。**这是整套方案第一个要验证的点**,过不了这关,后面都不用调。
+| 项 | 结果 |
+|---|---|
+| 能否调通 | 通过,经公司网关调用 `deepseek-v4.1-flash` |
+| 接通后数据 | 观察 25 到 31 条(随对话增长)、会话总结 4 条以上、队列积压 0 |
+| 笔记语言 | 观察正文为中文;facts 和会话总结仍有英文 |
+
+仍未证实:
+
+- 直连 codebuddy 是否真的不行(只是推断)。
+- 额度限制、长期稳定性。网关域名含 `testsite`,是测试环境,可能变动。
+- 笔记质量只看过数量和语言,没有系统评估。
 
 ---
 
@@ -170,12 +200,12 @@ codebuddy 能否被 `openai-compatible` 调通、笔记质量如何、有无额�
 
 ### 要改的键
 
-| 键 | 默认 | 改成 | 说明 |
-|---|---|---|---|
-| `REDACT_ENABLED` | `false` | `"true"` | 总开关。入库前把已识别的密钥替换成 `<redacted type='规则名'/>`,覆盖工具输入输出、提示词、总结。内置 35 条规则,含 aws、github_pat、openai_key、anthropic_key、jwt、private_key_pem、url_credentials 等 |
-| `REDACT_GENERIC_ENABLED` | `false` | `"true"` | 额外 4 条没有厂商前缀的规则:`password=`、`*_TOKEN/*_SECRET/*_API_KEY`、`Authorization: Bearer`、`Basic`。要求值至少 8 位且含字母,`max_tokens=4096` 这类纯数字不误杀。低置信度,可能误伤 |
-| `MEDIA_CAPTURE_ENABLED` | `true` | `"false"` | 默认**会把图片存在本机**,每张最大 3 MiB,本地没有总量上限。不需要就关 |
-| `TELEGRAM_ENABLED` | `true` | `"false"` | 图个安心。没填 bot token 和 chat id 本来就不会发 |
+| 键                        | 默认      | 改成        | 说明                                                                                                                                                   |
+| ------------------------ | ------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REDACT_ENABLED`         | `false` | `"true"`  | 总开关。入库前把已识别的密钥替换成 `<redacted type='规则名'/>`,覆盖工具输入输出、提示词、总结。内置 35 条规则,含 aws、github_pat、openai_key、anthropic_key、jwt、private_key_pem、url_credentials 等 |
+| `REDACT_GENERIC_ENABLED` | `false` | `"true"`  | 额外 4 条没有厂商前缀的规则:`password=`、`*_TOKEN/*_SECRET/*_API_KEY`、`Authorization: Bearer`、`Basic`。要求值至少 8 位且含字母,`max_tokens=4096` 这类纯数字不误杀。低置信度,可能误伤          |
+| `MEDIA_CAPTURE_ENABLED`  | `true`  | `"false"` | 默认**会把图片存在本机**,每张最大 3 MiB,本地没有总量上限。不需要就关                                                                                                             |
+| `TELEGRAM_ENABLED`       | `true`  | `"false"` | 图个安心。没填 bot token 和 chat id 本来就不会发                                                                                                                   |
 
 ### 要核对、必须保持为空的键
 
@@ -212,6 +242,36 @@ codebuddy 能否被 `openai-compatible` 调通、笔记质量如何、有无额�
 
 脱敏只能抓"已识别的格式"。它拦不住自然语言里的敏感内容,比如你在对话里说出的业务机密。
 
+### 实测结果
+
+已配置并生效的 4 个键(worker 读到的值已核对):
+
+| 键 | 值 |
+|---|---|
+| `REDACT_ENABLED` | `"true"` |
+| `REDACT_GENERIC_ENABLED` | `"true"` |
+| `MEDIA_CAPTURE_ENABLED` | `"false"` |
+| `TELEGRAM_ENABLED` | `"false"` |
+
+`CLOUD_SYNC_HUB_URL`、`CLOUD_SYNC_TOKEN`、`PRO_MEMORY_KEY` 核对为空。
+
+`MEDIA_CAPTURE_ENABLED` 有一次性迁移(曾把已保存的 `"false"` 改成 true)。本机迁移标记文件 `~/.claude-mem/.settings.json.media-capture-default-on-v1` 已存在,所以写 `"false"` 会被保留。
+
+脱敏验证:
+
+| 方式 | 做法 | 结果 |
+|---|---|---|
+| 单元 | 直接调用源码 `redactSensitive`,配置同上,13 个用例 | GitHub token、OpenAI `sk-`、AWS `AKIA`、JWT、URL 里的密码(只替换密码,主机和用户名保留)、`password=`、`MY_API_KEY=`、`Authorization: Bearer`、带变量名的网关 key、带 Bearer 的 curl 里的网关 key,全部被替换成 `<redacted type='规则名'/>`。误伤对照 `max_tokens=4096` 和设备 ID 未被误伤 |
+| 端到端 | 在真实工具调用里放 4 个假密钥,等观察者处理后扫描全库 38 张表 | 明文残留 0,库里有 redacted 标记 |
+
+限制与未证实:
+
+- **裸 key 不会被脱敏**:前后没有变量名或 `Bearer` 等关键词、也没有厂商前缀的字符串,规则认不出。实测漏掉了(网关 key 单独出现时未脱敏)。
+- 对策是 `REDACT_CUSTOM_PATTERNS` 自定义规则,但这会把 key 的前缀写进 `settings.json`。已决定先不加。
+- 库和日志里搜不到网关 key 明文,但**原因没完全查清**,不能当作脱敏一定可靠的证据。
+- **未验证**:发给网关的请求包是否也已脱敏。没抓包,只是从调用点推断。
+- 脱敏开启前的旧记忆不会被回头脱敏。
+
 ---
 
 ## 第 3 轮:采集,什么该记、什么不该记
@@ -220,31 +280,72 @@ codebuddy 能否被 `openai-compatible` 调通、笔记质量如何、有无额�
 
 少记噪音,省观察者的调用次数(省钱省时间),也让记忆更干净。
 
-### 键
+### 先说结论:6 个键里,在 OpenCode 下真正有用的只有 SKIP_TOOLS
 
-| 键 | 默认 | 建议 | 说明 |
+2026-11-08 逐个键用探针实测(往 `POST /api/sessions/observations` 发构造的工具事件,看返回 `skipped` 还是 `queued`),并读了 OpenCode 插件源码(`integrations/opencode-plugin/core.ts`)。
+
+| 键 | 在 OpenCode 下 | 证据 |
+|---|---|---|
+| `SKIP_TOOLS` | **有效** | 实测:新增的 9 个工具名都返回 `skipped / tool_excluded`;`bash`、`read`、`grep`、`edit`、`write`、`task` 等 10 个对照仍入队。不区分大小写,`todowrite` 与 `TodoWrite` 都跳 |
+| `SKIP_BASH_PATTERNS` | **无效** | 实测:设规则 `^echo CM_R3_PROBE` 后,工具名 `Bash` 被跳过(`bash_pattern_excluded`),但 `bash` 和 `shell` 照常入队。源码 `shellCommandOf` 只认 `Bash`、`PowerShell`、`exec_command` 三个名字,OpenCode 的命令工具叫小写 `bash`。要让它生效得改源码 |
+| `SKIP_SUBAGENT_OBSERVATIONS` / `SKIP_AGENT_TYPES` | **无效** | 实测:请求带 `agentId` 和 `agentType` 时被跳过,不带则入队。源码判定"子代理事件"要求两个字段同时有值;而 OpenCode 插件发给 worker 的字段里没有 `agentId`、`agentType`(`captureTool` 只发 `contentSessionId`、`tool_name`、`tool_input`、`tool_response`、`cwd`、`platform_source`、`tool_use_id`)。所以 OpenCode 的子代理工具调用在 worker 看来都是主代理。**没有在真实子代理场景再跑一遍**,但上述两项合起来足以判断 |
+| `EXCLUDED_PROJECTS` | 有效,但**当前不需要** | 实测:`/tmp/cm-r3-excluded/**` 配上后,该目录及其子目录返回 `project_excluded`,同级其他目录仍入队。你目前没有不想留记录的仓库,所以没配 |
+| `OBSERVE_BARE_PROMPTS` | 保持默认 `false` | 没改,没测 |
+| `OBSERVER_ENABLED` | 保持默认 `true` | 总开关,没改 |
+
+### 依据:你自己的使用数据
+
+没有靠猜。OpenCode 自己的库(`~/.local/share/opencode/opencode.db`,`part` 表)里有全部工具调用记录,取库内最近 30 天(库里最新一条是 2026-10-09)共 26763 次工具调用:
+
+| 工具 | 次数 | 平均输出长度(字符) | 判断 |
 |---|---|---|---|
-| `SKIP_TOOLS` | `ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUserQuestion` | 先保持;观察后追加 | 不记的工具名,逗号分隔,不区分大小写。OpenCode 的 `read` 会被适配成 `Read` 再匹配 |
-| `SKIP_BASH_PATTERNS` | 空 | 按需 | 一个正则,命令匹配上就不记。例:`^(ls\|cat\|pwd\|cd)\b`(多个用 `\|` 连接)。写错的正则被忽略,等于没设 |
-| `SKIP_SUBAGENT_OBSERVATIONS` | `false` | 按需 | 设 `"true"` 跳过所有子代理产生的笔记。你用 oh-my-openagent 这类多代理编排,子代理很多,这个值得考虑 |
-| `SKIP_AGENT_TYPES` | 空 | 按需 | 按子代理类型精确跳过,逗号分隔。源码注释推荐 `workflow-subagent` |
-| `EXCLUDED_PROJECTS` | 空 | 建议 | 不记的项目路径,glob 通配,支持 `*` `**` `?` 和开头的 `~`。命中的目录既不采集也不注入。**含敏感内容的仓库在这里排除** |
-| `OBSERVE_BARE_PROMPTS` | `false` | 保持 | 默认你的提示词不单独调一次观察者,而是随下一次工具事件那次调用一起带上,省调用。设 `true` 才恢复单独调用 |
+| `bash` | 13713 | 1068 | 占一半,内容混杂,留着 |
+| `read` | 4613 | 4740 | 留着,文件证据来源 |
+| `edit` | 3106 | 333 | 留着 |
+| `grep` | 1295 | 1832 | 留着 |
+| `skill_mcp` | 1200 | 1549 | 留着 |
+| `todowrite` | 692 | 872 | 出厂默认已跳 |
+| `write` | 475 | 27 | 留着 |
+| `glob` | 200 | 1510 | **跳**:只是文件名列表 |
+| `question` | 92 | 196 | **跳**:向用户提问,没有结论价值 |
+| `session_search` | 51 | 285 | **跳**:查别的会话,不是本会话产出 |
+| `lsp_prepare_rename`、`lsp_diagnostics` | 74、4 | 31、20 | **跳**:输出几乎为空 |
+| `background_cancel`、`invalid` | 17、6 | 229、3362 | **跳**:取消动作、无效调用 |
+| `zhiyan-log_GetCurrentTimestamp`、`iWiki_prepareAttachmentUpload` | 14、21 | 29、37 | **跳**:只返回时间戳或上传句柄 |
 
-### 怎么判断该不该跳
+子代理占比:主会话 24401 次、子代理会话 2362 次(约 9%),其中 `explore` 占 2033 次。这些在 OpenCode 下无法按子代理跳过,所以没配。
 
-先跑两三天默认值,在 viewer 里翻笔记。如果发现:
-- 大量"执行了 ls / cat / pwd"这类笔记,加到 `SKIP_BASH_PATTERNS`。
-- 大量子代理的流水账,开 `SKIP_SUBAGENT_OBSERVATIONS`。
-- 某个仓库不想留记录,加进 `EXCLUDED_PROJECTS`。
+### 已配置的值
 
-### 验证
+只改了 `SKIP_TOOLS`,其余 5 个键保持出厂默认:
 
-改完做一次对应操作,看 viewer 里是否还出现新笔记。
+```text
+CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUserQuestion,glob,question,session_search,lsp_prepare_rename,lsp_diagnostics,background_cancel,invalid,zhiyan-log_GetCurrentTimestamp,iWiki_prepareAttachmentUpload
+```
+
+前 5 个是出厂默认,后 9 个是新增。改后 worker 读到的值已核对,`settings.json` 软链未被破坏。
+
+### 刻意没跳的
+
+| 工具 | 为什么留着 |
+|---|---|
+| `bash` | 占一半,但里面有 `npm run build`、`curl`、`git` 等有价值的命令,也有 `cd`、`ls`、`cat` 噪音;`SKIP_BASH_PATTERNS` 无效,没法只滤噪音,整体跳会丢大量信息 |
+| `read`、`grep`、`edit`、`write` | 是"改了什么、看了什么"的主要证据 |
+| `task`、`skill_mcp`、`webfetch`、`websearch_*`、`background_output` | 输出可能很长,但有研究结论价值。是否跳,要看实际产出的记忆质量,**没有数据支撑,不动** |
+
+### 没解决的
+
+- `bash` 里的 `cd`、`ls`、`cat` 噪音压不掉,要改源码才行(把 `shellCommandOf` 加上小写 `bash`)。这是源码补丁,升级会冲掉,没做。
+- 子代理(约 9% 的调用)压不掉,原因同上,要让 OpenCode 插件发 `agentId`/`agentType`,也得改源码。
+- 这一轮只是按工具名分类,没有评估"哪些工具产出的记忆质量高"。要做得精,需要跑几天后翻 viewer 看。
+
+### 怎么验证
+
+用探针(往 `/api/sessions/observations` 发构造的事件)最直接,返回 `skipped` 即生效。注意探针会在库里留一个空会话,没有观察、总结或提问记录。
 
 ### 回退
 
-清空对应键,或恢复默认值。注意:**已记的笔记不会被删**,只影响新采集。
+把 `SKIP_TOOLS` 改回出厂默认(前 5 个)即可。已记的笔记不会被删,只影响新采集。
 
 ### 总开关
 

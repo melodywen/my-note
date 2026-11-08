@@ -23,7 +23,7 @@ related:
 
 > 一句话:**安装 claude-mem 就是在本机起一个常驻后台的小服务(worker),再给 OpenCode 和 DSH 各装一个适配插件;最大的两个坑是"选错观察者提供方会被引到云端登录"和"本机只有 opencode.jsonc,安装器却只认 opencode.json"。**
 >
-> 基于 claude-mem main 分支(约 v15.12.0)源码,**未实测**。凡标"未证实/未验证/推断/没读到"的地方,都不是确定结论。
+> 基于 claude-mem main 分支(约 v15.12.0)源码;OpenCode 端已于 2026-11-08 装机并实测,实测记录见 3.7 节,DSH 端尚未安装。凡标"未证实/未验证/推断/没读到"的地方,都不是确定结论。
 
 ---
 
@@ -220,23 +220,76 @@ npx claude-mem install --ide dsh --dsh-profile desktop --provider claude
 
 关于旧笔记提到的 `dsh/cordis.patch.yml`:**本次源码调研没有看到安装器直接操作它**,是通过 `dsh plugin ... add` 委托 DSH 自己处理的。以研究结论为准,旧笔记的说法不再采用。DSH 最终写了哪些文件,以装完实际对比为准。
 
-### 3.6 第六步:换成 codebuddy 做观察者,并改中文输出(可选)
+### 3.6 第六步:换成公司网关做观察者,并改中文输出
 
-如果第一步用的是 `--provider claude`,想换成 codebuddy,要一起改下面 5 个键,**缺一个都不会生效**(详细说明见 [[claude-mem-配置详解]]):
-
-```text
-CLAUDE_MEM_PROVIDER                 → openai-compatible
-CLAUDE_MEM_OPENAI_COMPAT_BASE_URL   → <codebuddy 的 OpenAI 兼容地址>
-CLAUDE_MEM_OPENAI_COMPAT_API_KEY    → <codebuddy 的 API Key>
-CLAUDE_MEM_OPENAI_COMPAT_MODEL      → <便宜的模型>
-CLAUDE_MEM_MODE                     → code--zh
-```
+第一步用 `--provider claude` 装完后,观察者在本机找不到 claude 可执行文件,实测不工作(见 3.7)。要换掉它,走 `openai-compatible` 提供方,指向一个 OpenAI 兼容网关。**不是直接填 codebuddy 的地址和 key,那条路行不通**,原因见下面"为什么不直连 codebuddy"。
 
 这里选 `openai-compatible` 而不选 `openrouter`:前者是独立提供方,不带 OpenRouter 归因请求头,key 也分开,而且**安装器没有它的配置流程**(`install.ts` 明说"在 settings.json 里配"),所以不会弹 cmem.ai 登录。
 
+#### 为什么不直连 codebuddy
+
+读了 `opencode-codebuddy-auth` 插件源码,codebuddy 的认证方式和 claude-mem 能发的请求对不上:
+
+| 项 | codebuddy 插件的做法 | claude-mem `openai-compatible` 能发的 |
+|---|---|---|
+| 认证 | 浏览器 OAuth 登录,token 存在 `~/.local/share/opencode/auth.json`,有过期时间,由插件调刷新接口续期 | 一个固定的 key |
+| 请求头 | 每次请求带约 25 个租户/用户头(`X-Tenant-Id`、`X-User-Id`、`X-Enterprise-Id`、`X-Domain` 等),从 JWT 解出 | 只发 `Authorization: Bearer <key>` |
+
+所以直连大概率 401/403。这是**推断,未实测**。
+
+#### 现在怎么配
+
+改走用户自己的 OpenAI 兼容网关(`interact_ecology_agent_manager_api_server` 的 openai-gateway,规格见该仓库 `openspec/specs/openai-gateway/spec.md`)。网关用系统配置的固定 Key 校验调用方,自己持有并刷新 codebuddy 凭证,对请求和响应原样透传。
+
+`~/.claude-mem/settings.json` 里的键:
+
+| 键 | 值 |
+|---|---|
+| `CLAUDE_MEM_PROVIDER` | `openai-compatible` |
+| `CLAUDE_MEM_OPENAI_COMPAT_PRESET` | `custom` |
+| `CLAUDE_MEM_OPENAI_COMPAT_BASE_URL` | `https://mapecology.testsite.woa.com/api/ecology/openai/v1` |
+| `CLAUDE_MEM_OPENAI_COMPAT_MODEL` | `deepseek-v4.1-flash` |
+| `CLAUDE_MEM_MODE` | `code--zh` |
+
+密钥不进 `settings.json`(它在 Git 里),放 `~/.claude-mem/.env`:
+
+```text
+OPENAI_COMPAT_API_KEY=<你的网关 key>
+```
+
+要点:
+
+- `BASE_URL` 只写到 `/v1`,claude-mem 会自动补 `/chat/completions`(`OpenAICompatProvider.ts` 约 474-476 行)。
+- 网关上游只收流式请求,claude-mem 默认发流式字段,正好匹配。
+- 上游若拒绝 `reasoning:{enabled:false}`,claude-mem 会自动去掉该字段重发一次(约 690-697 行)。
+- 域名含 `testsite`,是**测试环境**。观察者每次调用都会把对话原文发给该网关。
+- `MODE` 只管"笔记用什么语言写",和观察者换不换模型无关。
+
 改完用 `npx claude-mem restart` 重启 worker,再回到第四节核对:`BASE_URL` 不含 `cmem.ai`,云同步相关键仍为空。
 
-`MODE` 只管"笔记用什么语言写",和观察者换不换模型无关,可以单独改,换提供方前后都能用 `code--zh`(是否生效以实测为准)。
+### 3.7 实测记录(2026-11-08)
+
+按过程大致排列,个别条目的先后未逐一核对。
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 执行 `npx -y claude-mem install --ide opencode --provider claude --no-auto-start`(v15.12.0),腾讯镜像 `https://mirrors.tencent.com/npm/` 对部分包返回 403 报错 | 镜像对部分包拒绝访问 | 不影响安装结果,可忽略 |
+| 安装后 worker 在 37701 健康;`/api/projects` 显示来源 `opencode`、项目 `my-note`,提问原文写入 `user_prompts` 表 | 安装器构建的 OpenCode 插件 `plugins/claude-mem.js`(约 500KB)被 OpenCode 自动加载 | 无需处理 |
+| 安装器会生成 `opencode.json`,而本机用 `opencode.jsonc` | 安装器只认 `opencode.json` | 把 claude-mem 的 MCP 并入 `~/.config/opencode/opencode.jsonc` 的 `mcp.servers.claude-mem`,把 `opencode.json` 移走备份;`opencode mcp list` 显示 9 个 MCP 全部 connected |
+| 曾尝试把 `plugins/claude-mem.js` 入配置仓库,被工蜂 bugbot 拦下,报压缩文件里重试逻辑判断写反 | 该文件是第三方产物 | 不入库,已写入配置仓库 `.gitignore` |
+| 观察者不工作:观察 0 条,队列积压 11 | 找不到 claude 可执行文件 | 改用 `openai-compatible`(见 3.6) |
+| 直连 codebuddy 行不通(推断,未实测) | 认证方式和请求头对不上 | 走公司网关(见 3.6) |
+| 网关无 key 返回 401 `invalid_api_key` | 未带 key | 带上 key |
+| 带 key 不带 `stream` 返回 400 "Non-stream chat request is currently not supported" | 上游只收流式 | claude-mem 默认发流式字段,无需改 |
+| 带 `stream:true` 返回 200,流式分片,以 `[DONE]` 结束,约 1.3 秒 | 正常 | 无需处理 |
+| 切换后 `/api/health` 的 `ai.provider` 为 `openai-compatible`,`lastInteraction.success=true`;观察者调用 `deepseek-v4.1-flash-ioa`,每次约 3000-7000 token;观察从 0 增长,队列积压归零 | 配置生效 | 无需处理 |
+| 切换前积压的 11 条没有补处理,日志为 "Skipped expired live observer inputs; no replay scheduled" | 过期的观察输入被丢弃,不重放 | 提问原文仍在 `user_prompts`,不补处理 |
+| `settings.json` 与 `.env` 要进配置仓库管理 | 真文件放仓库,让 `~/.claude-mem/` 下的路径指过去 | `settings.json` 真文件放 `~/.config/opencode/claude-mem/settings.json`,软链回 `~/.claude-mem/settings.json`;`.env` 同样放该目录,软链回 `~/.claude-mem/.env`。仓库是私有仓库,用户确认 `.env` 可入库。重启 worker 后软链的 `.env` 照常被读到(观察继续入库) |
+| 日志:tree-sitter CLI 下载校验失败,校验和 `e3b0c442...` 是空文件的哈希 | 下载得到空内容,疑为公司网络或镜像拦截(未证实) | `smart_search`、`smart_outline`、`smart_unfold` 不能解析代码,File Read Gate 保持关闭;不影响记忆读写,暂不处理 |
+| 日志:My Work 看板找不到登录的 Claude/Codex/Gemini | 本机没有这些登录 | 与记忆无关,忽略 |
+| 重启时日志有"自替换交接超时,回退到命令行启动"告警 | 原因没查 | 重启仍成功,忽略 |
+| `CLAUDE_MEM_CLOUD_SYNC_DEVICE_ID` 有值,疑似云同步开关 | 它不是开关:首次启动 worker 时由 `ensureLocalDeviceIdentity` 生成,写回 `settings.json` 和数据库表 `local_work_view_identity`,之后沿用(worker 重启 4 次值不变);两处不一致会报错拒绝写入 | 不用删。云同步是否关闭看 `CLOUD_SYNC_HUB_URL` 是否为空(空即关闭);日志里 `sync.cmem.ai` 出现 0 次 |
+| `settings.json` 想写注释说明各键 | 它是标准 JSON(`atomic-json.ts` 用 `JSON.parse`),不能写注释,worker 也会重写它 | 配置仓库 `claude-mem/` 目录放带逐键注释的 `settings.example.jsonc`,worker 不读它 |
 
 ---
 
@@ -301,7 +354,19 @@ lsof -i -P | grep -i -E "bun|node" | grep -i -E "cmem|ESTABLISHED"
 ### 4.3 功能验证
 
 1. 重启 OpenCode,开一个新会话,用中文做点小事:例如让 agent 读一个文件、改一行、跑一条命令。
-2. 打开 worker 的网页查看器 `/viewer`,看有没有出现新的观察(observation)。查看器的具体端口我没读到,可先 `npx claude-mem status` 看 worker 信息。
+2. 打开 worker 的网页查看器 `http://127.0.0.1:37701/viewer`,看有没有出现新的观察(observation)。37701 是本机实测的 worker 端口。
+   也可以用接口查(均为实测可用,字段含义没有逐项记录):
+
+   | 接口 | 用途 |
+   |---|---|
+   | `/api/health` | 看 worker 健康;其中 `ai.provider` 应为 `openai-compatible`,`lastInteraction.success` 应为 `true` |
+   | `/api/stats` | 看统计数据 |
+   | `/api/projects` | 看项目和来源;本机显示来源 `opencode`、项目 `my-note` |
+   | `/api/processing-status` | 看观察的处理状态 |
+
+   ```bash
+   curl -s http://127.0.0.1:37701/api/health
+   ```
 3. 看产出的笔记是不是中文(设了 `code--zh` 才会)。
 4. 开第二个新会话,看开头是否注入了一份紧凑的记忆索引。
 5. 在会话里让 agent 搜一次记忆(也可用 `npx claude-mem search` 子命令)(`search` 的具体参数没读,先不要凭空猜,走会话内搜索更稳)。
@@ -422,18 +487,20 @@ npx claude-mem restore <file>   # 恢复
 
 ## 六、没读到/不确定清单
 
-1. **`opencode.jsonc` 与 `opencode.json` 并存是否冲突**:源码只读写 `opencode.json`,对 `opencode.jsonc` 没有检测和处理;并存后 OpenCode 本身怎么加载,**未证实**。
-2. **`CLAUDE_MEM_ONLINE_OPTIN=false` 是否有效**:源码中没找到处理该变量的逻辑,**未证实有效**,与旧笔记结论冲突。
-3. **非交互安装的细节**:`--provider openrouter` 非交互时是否还要额外参数,**未验证**;"需要 API key 或 `--provider claude`"是源码推断。
-4. **不登录时安装器会不会因联网失败而中断**:**未验证**,更新日志的说法可能只针对 cmem 提供方。
-5. **DSH 侧**:没看到直接操作 `cordis.patch.yml`,而是委托 `dsh plugin ... add`;DSH 最终改了哪些文件,没读到。旧笔记的说法不采用。
-6. **`host` 提供方**:已读源码确认它依赖本机已在运行的兼容服务,装不上就报错;但 OpenCode、DSH 上有没有现成组件充当这个服务,没读到,只能说大概率没有。
-7. **观察者接 codebuddy**:没实测,理论可行。
-8. **`/viewer` 的具体地址、日志位置**:没读到。worker 端口键已确认是 `CLAUDE_MEM_WORKER_PORT`,默认 `37700 + (uid % 100)`。
-9. **`repair`、`prune`、`search`、`teambrain` 等命令的细节参数**:没读到。
-10. **卸载是否清理 DSH 侧 profile 里的插件**,以及卸载不清手工合并内容:后者是推断。
-11. **匿名统计具体发什么**:没读。
-12. **全文基于源码阅读,没有任何一步在本机实测过**;`~/.claude-mem` 本机尚不存在。
+1. **`CLAUDE_MEM_ONLINE_OPTIN=false` 是否有效**:源码中没找到处理该变量的逻辑,**未证实有效**,与旧笔记结论冲突。
+2. **非交互安装的细节**:`--provider openrouter` 非交互时是否还要额外参数,**未验证**;"需要 API key 或 `--provider claude`"是源码推断。
+3. **不登录时安装器会不会因联网失败而中断**:**未验证**,更新日志的说法可能只针对 cmem 提供方。
+4. **DSH 侧**:没看到直接操作 `cordis.patch.yml`,而是委托 `dsh plugin ... add`;DSH 最终改了哪些文件,没读到。旧笔记的说法不采用。DSH 端**尚未安装**。
+5. **`host` 提供方**:已读源码确认它依赖本机已在运行的兼容服务,装不上就报错;但 OpenCode、DSH 上有没有现成组件充当这个服务,没读到,只能说大概率没有。
+6. **直连 codebuddy 是否 401/403**:只是据插件源码的推断,**未实测**。
+7. **观察者发给网关的请求包是否已脱敏**:没抓包,**未证实**。
+8. **两端项目名是否一致**:OpenCode 端是 `my-note`;DSH 端项目名未验证。DSH 写入的来源名按源码推为 `dsh`,**未验证**。
+9. **网页保存设置后软链是否保持**:据 `atomic-json` 只读推断,**未验证**。
+10. **tree-sitter 下载得到空内容的原因**:疑为公司网络或镜像拦截,**未证实**;"自替换交接超时"告警的原因没查。
+11. **日志文件位置**:没记录。worker 端口键已确认是 `CLAUDE_MEM_WORKER_PORT`,默认 `37700 + (uid % 100)`。
+12. **`repair`、`prune`、`search`、`teambrain` 等命令的细节参数**:没读到;`install`/`restart`/`restore`/`search`/`start`/`status`/`stop`/`uninstall`/`update` 在源码命令分支中存在,具体参数未读。
+13. **卸载是否清理 DSH 侧 profile 里的插件**,以及卸载不清手工合并内容:后者是推断。
+14. **匿名统计具体发什么**:没读。
 
 ---
 

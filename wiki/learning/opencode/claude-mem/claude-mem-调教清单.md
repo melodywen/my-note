@@ -62,8 +62,8 @@ npx claude-mem restart
 | 第 1 轮 | 观察者:接上 codebuddy(经公司网关)、中文输出 | 6 | 必改 | 已做,实测通过 |
 | 第 2 轮 | 隐私:不泄密、不外发、不存图 | 7 | 必改 | 已做,脱敏已验证 |
 | 第 3 轮 | 采集:什么该记、什么不该记 | 6 | 建议 | 已做,仅 SKIP_TOOLS 有效,其余 5 键在 OpenCode 下无效或暂不需要 |
-| 第 4 轮 | 注入:开会话时塞多少旧记忆 | 6 | 建议 | 未做 |
-| 第 5 轮 | 检索:中文召回与 90 天窗口 | 4 | 建议 | 未做 |
+| 第 4 轮 | 注入:开会话时塞多少旧记忆 | 6 | 建议 | 已测,保持默认,一个键都没改 |
+| 第 5 轮 | 检索:中文召回与 90 天窗口 | 4 | 建议 | 已做:`SEARCH_RECENCY_DAYS` 改为 `0`,其余 3 键保持默认 |
 | 第 6 轮 | 跨端:OpenCode 与 DSH 共用 | 3 | 必改(若要共用) | 未做 |
 | 第 7 轮 | 运维:备份、日志、清理 | 6 | 可选 | 未做 |
 | 附 | 先别碰的键 | | 观察 | 未做 |
@@ -366,7 +366,7 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 | `CONTEXT_OBSERVATIONS` | `50` | 最多注入多少条观察。校验范围 0 到 200,取最近的 N 条 | 嫌上下文太满就降到 20 到 30;想要更多历史就升 |
 | `CONTEXT_SESSION_COUNT` | `10` | 显示最近多少次"会话总结" | 一般不动。上下文超预算时会被减半 |
 | `CONTEXT_FULL_COUNT` | `0` | 最近前 N 条除了标题还展开详细内容。0 = 全只显示标题 | 想让最近几条更详细可设 3 到 5。上下文瘦身时它最先被砍 |
-| `CONTEXT_FULL_FIELD` | `narrative` | 展开时用哪个字段:`narrative`(叙述长文)或 `facts`(要点列表) | 只在 `FULL_COUNT` 大于 0 时有用。想省 token 用 `facts` |
+| `CONTEXT_FULL_FIELD` | `narrative` | 展开时用哪个字段:`narrative`(叙述长文)或 `facts`(要点列表) | 只在 `FULL_COUNT` 大于 0 时有用。**实测 `facts` 反而比 `narrative` 更长**(`FULL_COUNT=3` 时 6095 对 5645 字符,样本仅 3 条展开),原先"想省 token 用 `facts`"的说法不成立 |
 | `CONTEXT_OBSERVATION_TYPES` | 空 | 类型白名单,如 `bugfix,decision,discovery`。空 = 当前模式里的所有类型 | 只能缩小不能超出模式的类型表;模式里没有的名字被忽略 |
 | `CONTEXT_MAIN_AGENT_ONLY` | `true` | 注入时不带子代理的笔记,避免流水账挤掉主会话的长期记忆 | 保持。搜索和 viewer 仍能看到全部 |
 
@@ -378,7 +378,25 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 
 ### 验证
 
-开一个新会话,看注入的内容长度和内容(OpenCode 里能否直接看到注入文本,**没读到**;可看 viewer 或日志)。
+注入文本可以直接取:OpenCode 插件开会话时调用的就是 `GET /api/context/inject?cwd=<目录>&platformSource=opencode`,用 `curl -G` 带上这两个参数即可拿到原文并量长度。
+
+### 实测结果(2026-11-08)
+
+库里当时 130 条观察、20 条总结。默认值下注入约 5000 字符(折算约 2500 到 3300 token,按中英混合估算),由 50 条观察标题、10 条会话总结和一段约 1450 字符的"待办清单"说明组成。逐键改动后的长度:
+
+| 动作 | 注入字符数 | 结论 |
+|---|---|---|
+| 默认(50/10/0) | 约 5035 | 基线 |
+| `OBSERVATIONS=30` | 4223 | 只省约 800,不值得 |
+| `FULL_COUNT=3`,`narrative` | 5645 | 多约 600,换最近 3 条展开正文 |
+| `FULL_COUNT=3`,`facts` | 6095 | 比 `narrative` 更长 |
+| `OBSERVATION_TYPES=decision,change` | 6006,观察变 35 条 | 变长,且库里 discovery 占 103/130,过滤后丢掉"发现了什么"类结论 |
+| `WORK_STATE_ENABLED=false` | 3580 | 省约 1450,代价是失去 `work_state_write` |
+| `MEMORY_INSTRUCTIONS_ENABLED=false` | 5035,无变化 | 在 OpenCode 下无效 |
+
+结论:总量本来就小,每个键最多省 15% 到 30%,**不改任何键**。`MEMORY_INSTRUCTIONS_ENABLED` 无效的原因是它只在 Claude Code 的钩子路径(`cli/handlers/context.ts`)里读取,OpenCode 走的是 `/api/context/inject`,不读它。`CONTEXT_MAIN_AGENT_ONLY` 在 OpenCode 下也形同虚设,因为插件不发 `agentId`/`agentType`,所有事件都当主代理。
+
+新项目(库里没有任何观察)注入的是约 2050 字符的欢迎提示,不含记忆段。
 
 ### 想要但要谨慎:每次提问的语义注入
 
@@ -393,7 +411,7 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 
 | 键 | 默认 | 备注 |
 |---|---|---|
-| `MEMORY_INSTRUCTIONS_ENABLED` | `true` | 注入时附一段"怎么用 claude-mem 记忆"的说明。设 `false` 省一点 token,但可能影响模型是否会主动去查记忆 |
+| `MEMORY_INSTRUCTIONS_ENABLED` | `true` | 注入时附一段"怎么用 claude-mem 记忆"的说明。**在 OpenCode 下无效**(实测设 `false` 长度不变,见上)。只对 Claude Code 路径有效 |
 | `WELCOME_HINT_ENABLED` | `true` | 项目还没有任何观察时,注入一段欢迎提示,第一条记忆落库后消失 |
 | `WORK_STATE_ENABLED` | `true` | 注入"工作状态(待办清单)"段落。你自己另有任务跟踪(如 todo 工具)可设 `false` |
 | `REINFORCE_ALPHA` | `0` | 实验性排序权重,0 = 关,注入就是"最近的 N 条"。文档建议试 0.5,**暂不动** |
@@ -404,7 +422,7 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 
 ### 先看清现状
 
-你的笔记是中文,而本机默认配置在中文上有两个已知短板(下表是读源码得出,**没实测**):
+你的笔记是中文,而本机默认配置在中文上有两个已知短板(下表是读源码得出;向量层的中文召回另有实测,见本节"实测结果"):
 
 | 短板 | 在哪 | 是什么 |
 |---|---|---|
@@ -415,16 +433,16 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 
 ### 键
 
-| 键 | 默认 | 建议 | 说明 |
-|---|---|---|---|
-| `SEARCH_RECENCY_DAYS` | `90` | 建议改成 `"0"` 或更大 | 不带日期的语义搜索只返回最近 N 天的匹配。默认 90,所以**超过 90 天的旧记忆在语义搜索里搜不到**。`0` = 关闭窗口。明确给 `dateStart/dateEnd` 时以你给的范围为准。非非负整数的值会被忽略保持 90。改完要重启 worker |
-| `CHROMA_EMBEDDING_FUNCTION` | `default` | **先别改** | 白名单只有 `default`/`openai`/`cohere`/`jina`/`voyageai`/`roboflow`。除 `default` 外全是云端 API,**会把你的记忆文本发给第三方**。只对新建集合生效,改了还必须重建索引 |
-| `CHROMA_MODE` | `local` | 保持 | `local` 由 worker 用 uvx 在本机起 chroma-mcp 子进程;`remote` 连已有的 Chroma 服务 |
-| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | **改了也没用** | 可选 4 个(含 3 个多语言),但**只在服务器模式(Postgres + pgvector)下被读取**。worker/Chroma 路径用的是 `CHROMA_EMBEDDING_FUNCTION`。这条由 grep 确认:`CLAUDE_MEM_EMBEDDING_MODEL` 在 src 里只被 `ObservationEmbeddingService.ts`(服务器模式)读取 |
+| 键                           | 默认                 | 建议             | 说明                                                                                                                                                                                                  |
+| --------------------------- | ------------------ | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SEARCH_RECENCY_DAYS`       | `90`               | 建议改成 `"0"` 或更大 | 不带日期的语义搜索只返回最近 N 天的匹配。默认 90,所以**超过 90 天的旧记忆在语义搜索里搜不到**。`0` = 关闭窗口。明确给 `dateStart/dateEnd` 时以你给的范围为准。非非负整数的值会被忽略保持 90。改完要重启 worker                                                                   |
+| `CHROMA_EMBEDDING_FUNCTION` | `default`          | **先别改**        | 白名单只有 `default`/`openai`/`cohere`/`jina`/`voyageai`/`roboflow`。除 `default` 外全是云端 API,**会把你的记忆文本发给第三方**。只对新建集合生效,改了还必须重建索引                                                                           |
+| `CHROMA_MODE`               | `local`            | 保持             | `local` 由 worker 用 uvx 在本机起 chroma-mcp 子进程;`remote` 连已有的 Chroma 服务                                                                                                                                  |
+| `EMBEDDING_MODEL`           | `all-MiniLM-L6-v2` | **改了也没用**      | 可选 4 个(含 3 个多语言),但**只在服务器模式(Postgres + pgvector)下被读取**。worker/Chroma 路径用的是 `CHROMA_EMBEDDING_FUNCTION`。这条由 grep 确认:`CLAUDE_MEM_EMBEDDING_MODEL` 在 src 里只被 `ObservationEmbeddingService.ts`(服务器模式)读取 |
 
 ### 90 天窗口对"补查"的影响
 
-已读 `SearchOrchestrator.ts`(第 155 到 195 行):Chroma 有 query 时先走语义搜索,**只有某个类别(观察、会话、提示词)整类为空,才去 SQLite 补查**;SQLite 补查不套 90 天窗口(源码注释明说)。所以**如果近 90 天里有几条不相干的结果,这一类就不算空,100 天前那条精确匹配的笔记不会被 LIKE 捞回来**。这个推论是我根据读到的分支条件推的,没实测。所以第一件事就是放宽窗口。
+已读 `SearchOrchestrator.ts`(第 155 到 195 行):Chroma 有 query 时先走语义搜索,**只有某个类别(观察、会话、提示词)整类为空,才去 SQLite 补查**;SQLite 补查不套 90 天窗口(源码注释明说)。所以**如果近 90 天里有几条不相干的结果,这一类就不算空,100 天前那条精确匹配的笔记不会被 LIKE 捞回来**。这个推论已用构造的数据实测证实(见下)。所以第一件事就是放宽窗口。
 
 ### 调教顺序
 
@@ -443,6 +461,38 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 ### 回退
 
 `SEARCH_RECENCY_DAYS` 改回 `"90"`。
+
+### 实测结果(2026-11-08)
+
+**已配置:`SEARCH_RECENCY_DAYS = "0"`**,其余 3 个键(`CHROMA_EMBEDDING_FUNCTION`、`CHROMA_MODE`、`EMBEDDING_MODEL`)保持默认。worker 约 7 秒后读到新值,搜索正常,`settings.json` 软链完好,日志无告警。
+
+这一轮不能在真实库上对比,因为库里最早一条观察是今天 16:17,没有超过 90 天的数据。改用上游源码直接跑,构造数据验证两条推论:
+
+| 实验 | 构造 | 结果 |
+|---|---|---|
+| 窗口过滤 | 向量层命中 2 条:5 天前一条、100 天前一条 | 窗口 90 天只返回 `[1]`;窗口 0 返回 `[1,2]` |
+| 补查推论 A | 向量层近期无命中(该类整类为空),关键词层有一条 100 天前的精确命中 | 触发 SQLite 补查,返回 100 天前那条 |
+| 补查推论 B | 向量层近期有 1 条不相干命中,关键词层同样有 100 天前的精确命中 | 不触发补查,SQLite 调用 0 次,100 天前那条被漏掉 |
+
+B 就是之前推论的情形:近 90 天里只要有一条不相干的向量结果,这一类就不算空,100 天前的精确命中捞不回来。关掉窗口后向量层本身就不再按时间截断,这个坑就没了。上游自带的 `chroma-search-strategy.test.ts` 37 条测试通过(含 `0` 关闭窗口、自定义 N 天、显式日期范围优先、corpus 构建绕过窗口)。
+
+限制:以上用 mock 数据在源码层验证,没有在真实向量库里放 90 天前的数据再搜。关窗口的副作用(旧而不相关的结果混进来)取决于向量层返回多少候选,本机库太小,看不出来。
+
+### 中文召回
+
+此前已实测(纯向量,29 条观察、12 条查询,样本小,仅作方向):英问英与英问中尚可,**中问英垫底**(命中排名 29/20/22)。`all-MiniLM-L6-v2` 是英文调优模型。
+
+可选项的取舍:
+
+| 选项 | 状态 |
+|---|---|
+| 云端嵌入函数(`openai`/`cohere`/`jina`/`voyageai`/`roboflow`) | **不建议**:会把记忆文本发给第三方,与第 2 轮隐私目标冲突;只对新建集合生效,还得重建索引 |
+| `EMBEDDING_MODEL` 换多语言模型 | **无效**:只在服务器模式(Postgres + pgvector)读取 |
+| 服务器模式 | 要 Postgres,不是轻量用法,没试 |
+| 改源码换本地多语言嵌入(`LocalEmbedder`→`ChromaSync`) | 只改配置做不到,没实现 |
+| memsearch(自带本地 bge-m3) | 备选方向,没评估 |
+
+结论:中文召回的短板**这一轮没有改配置能解决的办法**,先接受现状。关键词层对原词匹配可用,实际表现等 DSH 接入、真实项目积累几百条以后再评估。
 
 ---
 
@@ -575,10 +625,10 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 3. `host` 提供方:源码确认它依赖本机已在运行的兼容服务,安装器不起;OpenCode、DSH 上有没有现成服务,没读到。
 4. viewer 的具体地址、备份快照的具体目录:没读到。
 5. `code--zh` 模式沿用 `code` 的类型表(已读 `code.json`);`code--zh` 实际输出的笔记质量没实测。
-6. OpenCode 里能否直接看到注入的上下文文本:没读到。
+6. OpenCode 里能否直接看到注入的上下文文本:界面里能否看到没读到;但可用 `/api/context/inject` 取到同样的文本,见第 4 轮。
 7. 用户手写 JSON 布尔值或数组(而非字符串)是否被接受:没读到,照字符串写最稳。
-8. 中文向量召回的实际差距:源码注释佐证,没实测。
-9. 90 天窗口对补查的影响:已读 `SearchOrchestrator.ts` 的分支条件,推论成立,没实测。
+8. 中文向量召回:已实测(纯向量,样本小,仅作方向),中问英垫底;换多语言向量需改源码,没做。
+9. 90 天窗口对补查的影响:已用构造数据在上游源码层实测,推论成立;没有在真实向量库里放 90 天前的数据验证。
 10. DSH 写入记忆时用的来源名:源码里没查到。
 11. 两端同目录算出的项目名是否一致:源码层面一致,没实测。
 12. 图片采集的具体上限(本地 3 MiB、给模型 256 KiB、每事件最多 4 张)来自源码注释,没实测。

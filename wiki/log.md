@@ -10,6 +10,15 @@ updated: 2026-11-08
 
 ---
 
+## 2026-11-08 — claude-mem 第 4、5 轮调教
+
+- 第 4 轮(注入):逐键实测注入长度,默认约 5000 字符;`FULL_COUNT` 用 `facts` 反而更长,`MEMORY_INSTRUCTIONS_ENABLED` 在 OpenCode 下无效,`OBSERVATION_TYPES` 过滤反而变长。结论:不改任何键
+- 第 5 轮(检索):`SEARCH_RECENCY_DAYS` 改为 `0`;用上游源码构造数据证实窗口过滤与"整类为空才补查"两条推论;中文召回无配置层解法
+- 调研:claude-mem 没有冲突推翻与 dream 整理,仓库 issue #1792 有人提议;可用 `DELETE /api/observation/:id`、`save_memory` 手动处理
+- 订正:[[claude-mem-调教清单]] 第 4、5 轮与状态列
+
+---
+
 ## 2026-11-08 — claude-mem 接通公司网关并实测,文档按实测订正
 
 - 观察者接通:provider 为 openai-compatible,走公司网关(测试环境域名),模型 deepseek-v4.1-flash;密钥放 `.env`,`settings.json` 与 `.env` 真文件在配置仓库、软链回 `~/.claude-mem/`

@@ -10,6 +10,10 @@ updated: 2026-11-08
 
 ---
 
+## [2026-11-08] create | claude-mem 存储与读取机制、跨端共享,并订正 host 提供方
+
+新增 [[claude-mem-存储与读取机制]]、[[claude-mem-跨端共享]]。跨端调研(lib-2)有三处与源码不符,已按源码改正:DSH 有官方集成(`--ide dsh`,`@claude-mem/dsh`,靠 worker 监听 `~/.dsh/sessions` 写入),`INCLUDE_ALL_SOURCES` 存在且 OpenCode 插件也读,OpenCode 注入走系统提示词钩子而非 `AGENTS.md`。订正 `--provider host`:它要求本机已有兼容服务、安装器不会起,是为 Grok Bot/Cursor 设计,对 OpenCode/DSH 大概率不可用;安装部署、调教清单、配置详解里"首次先用 host"的建议改为先用 `claude` 再改 codebuddy。均未实测。
+
 ## [2026-11-08] remove | 卸载 opencode-mem
 
 摘除插件配置,删除全局配置、数据目录 `~/.opencode-mem`、npm 缓存和旧 markdown 库;未备份记忆数据。相关两篇笔记已加卸载说明。

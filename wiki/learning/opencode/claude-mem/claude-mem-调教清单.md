@@ -154,7 +154,7 @@ lsof -i -P | grep -i cmem
 
 ### 回退
 
-`PROVIDER` 改回 `claude`(需本机有 Claude 登录),或用安装器装的 `host`。**我没读到 `host` 提供方在 OpenCode 与 DSH 上的实际表现**,需要实测。
+`PROVIDER` 改回 `claude`(需本机有 Claude 登录)。不要回退到 `host`:它要求本机已有一个兼容服务,安装器不会替你起,对 OpenCode 与 DSH 大概率不可用(见 [[claude-mem-安装部署]] 2.4 节)。
 
 ### 没实测
 
@@ -471,7 +471,7 @@ codebuddy 能否被 `openai-compatible` 调通、笔记质量如何、有无额�
 
 1. codebuddy 的真实 OpenAI 兼容地址和可用模型名:未知,需要你提供。
 2. codebuddy 能否被 `openai-compatible` 调通、笔记质量、有无额度限制:没实测。
-3. `host` 提供方在 OpenCode、DSH 上的表现:没读到。
+3. `host` 提供方:源码确认它依赖本机已在运行的兼容服务,安装器不起;OpenCode、DSH 上有没有现成服务,没读到。
 4. viewer 的具体地址、备份快照的具体目录:没读到。
 5. `code--zh` 模式沿用 `code` 的类型表(已读 `code.json`);`code--zh` 实际输出的笔记质量没实测。
 6. OpenCode 里能否直接看到注入的上下文文本:没读到。

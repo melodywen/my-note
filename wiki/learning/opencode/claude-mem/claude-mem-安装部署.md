@@ -112,17 +112,17 @@ claude-mem 和 opencode-mem 并存会**重复注入**上下文。测试期间先
 | `gemini`            | 要                         | **交互模式默认引导浏览器登录 cmem.ai** | 想用 Gemini 且接受登录                          |
 | `openrouter`        | 要(如 `OPENROUTER_API_KEY`) | **交互模式默认引导浏览器登录 cmem.ai** | 想后续把 `BASE_URL` 改成 codebuddy 的人          |
 | `openai-compatible` | 要                         | **不会**(安装器没有它的流程)         | 要接 codebuddy 等自定义地址:装完手改 `settings.json` |
-| `host`              | 不要                        | 不需要                       | 让宿主 agent 自己写笔记,最省事                      |
+| `host`              | 不要                        | 不需要                       | **不适合你**:要求本机已有一个兼容服务,见下文 |
 
 要点:
 
-- 选 `claude` / `codex` / `host`,不需要 claude-mem 账号。
+- 选 `claude` / `codex` / `host`,不需要 claude-mem 账号。但 `host` 还要求本机有现成服务,见下一条。
 - 选 `gemini` / `openrouter`,交互安装会走 `completeCmemTrialPairing`(浏览器配对 cmem.ai)。登录本身不会自动把记忆传云上,但会引出"托管观察者模型"这条路,里面发的是原始工具调用,风险最大(见第四节)。
-- 非交互安装(脚本里跑)需要先准备好对应 API key(如 `OPENROUTER_API_KEY`),或直接用 `--provider host`。这是源码推断(`validateNonInteractiveProvider`)。
-- `host` 在 OpenCode、DSH 上写出的笔记质量如何,**没读到**。
+- 非交互安装(脚本里跑)需要先准备好对应 API key(如 `OPENROUTER_API_KEY`),或用 `--provider claude`(没写 `--provider` 的非交互安装默认就是 claude)。这是源码推断(`validateNonInteractiveProvider`)。
+- `host` 的真实含义:观察者不调云端,而是请求本机回环端口(127.0.0.1:37777 或 37778)上一个**你自己已经在跑的**兼容服务,由宿主 agent 充当记账员。安装器**不会替你起这个服务**,探测不到就直接报错退出(`cmem-memory-credentials.ts` 的 `resolveHostObserverPort`)。它是为 Grok Bot 和 Cursor 设计的(观察者模型名只有 `cursor`、`grok-bot` 两个,出处同文件的 `buildHostObserverSettings`),官方文档也只在 Grok Bot 章节讲它。**我没读到任何组件会在 OpenCode 或 DSH 上起这个服务,所以对你的两个端大概率不可用,不要当首选。**
 - 观察者接 codebuddy 没实测。源码里 `openai-compatible` 与 `openrouter` 都允许自定义 `BASE_URL`,前者更干净(见 3.6 节),理论可行。
 
-> 建议:**第一次先用 `--provider host`**,不需要 key,不触发登录,先把整条链路跑通;链路通了再按 3.6 节换成 `openai-compatible` + codebuddy。
+> 建议:**第一次用 `--provider claude` 装**,不触发 cmem.ai 登录;装完直接按 3.6 节把五个键改成 `openai-compatible` + codebuddy。没有 Claude 登录时,装完到改好配置之前观察者会不可用,这段时间不会产生记忆,属预期。`--provider claude` 在没登录 Claude 的机器上是否能顺利装完,**未验证**。
 
 ### 2.5 关于 CLAUDE_MEM_ONLINE_OPTIN=false(事实冲突)
 
@@ -131,7 +131,7 @@ claude-mem 和 opencode-mem 并存会**重复注入**上下文。测试期间先
 | 旧笔记(claude-mem-深入调研) | 装的时候加 `CLAUDE_MEM_ONLINE_OPTIN=false` 就能避免登录 |
 | 本次源码调研 | 源码里**没找到处理该变量的逻辑**,只看到相关的邮箱注册设置被留空 |
 
-结论:**"该变量能避免登录"未证实有效**。不要靠它保证不联网。真正可靠的做法是选不需要账号的提供方(`host` / `claude` / `codex`),装完再用第四节的清单核对。
+结论:**"该变量能避免登录"未证实有效**。不要靠它保证不联网。真正可靠的做法是选不需要账号的提供方(`claude` / `codex`),装完再用第四节的清单核对。
 
 ---
 
@@ -162,8 +162,8 @@ cat ~/.config/opencode/opencode.json     # 如果新生成了,看里面写了什
 ### 3.1 第一步:只装 OpenCode
 
 ```bash
-# 推荐首次:host 提供方,不要 key,不登录
-npx claude-mem install --ide opencode --provider host
+# 推荐首次:claude 提供方,不触发 cmem.ai 登录,装完再改成 codebuddy
+npx claude-mem install --ide opencode --provider claude
 ```
 
 如果想用 openrouter(非交互,先备好 key,key 用你自己的):
@@ -179,7 +179,7 @@ OPENROUTER_API_KEY=<你的key> npx claude-mem install --ide opencode --provider 
 | | 内容 |
 |---|---|
 | 预期现象 | 检查 Node/Bun,创建或更新 `~/.claude-mem/settings.json`;复制 `~/.config/opencode/plugins/claude-mem.js`;写入 OpenCode 配置;清理全局 `AGENTS.md` 里旧的 claude-mem 记忆块;自动启动 worker |
-| 出问题 | Node 版本不够:升级后重跑。选了 gemini/openrouter 却弹浏览器:关掉,改用 `--provider host` 重装。安装报联网失败:更新日志提过"无法访问 cmem.ai 的非交互安装会失败",是否只针对 cmem 提供方,**未验证**;换 `host` 再试 |
+| 出问题 | Node 版本不够:升级后重跑。选了 gemini/openrouter 却弹浏览器:关掉,改用 `--provider claude` 重装。安装报联网失败:更新日志提过"无法访问 cmem.ai 的非交互安装会失败",是否只针对 cmem 提供方,**未验证**;换 `claude` 再试 |
 
 ### 3.2 第二步:关匿名统计
 
@@ -208,7 +208,7 @@ npx claude-mem doctor
 ### 3.5 第五步:装 DSH
 
 ```bash
-npx claude-mem install --ide dsh --dsh-profile desktop --provider host
+npx claude-mem install --ide dsh --dsh-profile desktop --provider claude
 ```
 
 本机 profile 是 `desktop`,不是文档默认的 `web`,不写 `--dsh-profile` 会按默认 `web` 处理,不符合本机。
@@ -222,7 +222,7 @@ npx claude-mem install --ide dsh --dsh-profile desktop --provider host
 
 ### 3.6 第六步:换成 codebuddy 做观察者,并改中文输出(可选)
 
-如果第一步用的是 `--provider host`,想换成 codebuddy,要一起改下面 5 个键,**缺一个都不会生效**(详细说明见 [[claude-mem-配置详解]]):
+如果第一步用的是 `--provider claude`,想换成 codebuddy,要一起改下面 5 个键,**缺一个都不会生效**(详细说明见 [[claude-mem-配置详解]]):
 
 ```text
 CLAUDE_MEM_PROVIDER                 → openai-compatible
@@ -236,7 +236,7 @@ CLAUDE_MEM_MODE                     → code--zh
 
 改完用 `npx claude-mem restart` 重启 worker,再回到第四节核对:`BASE_URL` 不含 `cmem.ai`,云同步相关键仍为空。
 
-`MODE` 只管"笔记用什么语言写",和观察者换不换模型无关,可以单独改:`host` 提供方下也能用 `code--zh`(是否生效没读到,以实测为准)。
+`MODE` 只管"笔记用什么语言写",和观察者换不换模型无关,可以单独改,换提供方前后都能用 `code--zh`(是否生效以实测为准)。
 
 ---
 
@@ -296,7 +296,7 @@ lsof -i -P | grep -i -E "bun|node" | grep -i -E "cmem|ESTABLISHED"
 | 托管观察者模型 | 登录后选 claude-mem 为提供方,工具调用内容发到 `https://cmem.ai/api/inference/v1` | 需选择才发 |
 | 匿名统计 | 默认开 | 开,用 3.2 关 |
 
-不登录时,观察者内容只发给你自己选的提供方。选 `host` 时是否有额外外发,没读到。
+不登录时,观察者内容只发给你自己选的提供方。选 `host` 时请求只发到本机回环端口;那头的 agent 自己会不会再往外发,没读到。
 
 ### 4.3 功能验证
 
@@ -306,7 +306,7 @@ lsof -i -P | grep -i -E "bun|node" | grep -i -E "cmem|ESTABLISHED"
 4. 开第二个新会话,看开头是否注入了一份紧凑的记忆索引。
 5. 在会话里让 agent 搜一次记忆(也可用 `npx claude-mem search` 子命令)(`search` 的具体参数没读,先不要凭空猜,走会话内搜索更稳)。
 
-没有观察产出时:先 `npx claude-mem doctor`,再确认 worker 在跑,再确认观察者提供方可用(host/key/额度)。
+没有观察产出时:先 `npx claude-mem doctor`,再确认 worker 在跑,再确认观察者提供方可用(key/额度;选了 host 的话,还要确认本机回环端口上有服务在听)。
 
 DSH 装好后同样做一遍,并验证跨来源召回。旧笔记提到可打开 `CLAUDE_MEM_SESSION_START_INCLUDE_ALL_SOURCES: "true"`,让一端能看到另一端的记忆,详见 [[claude-mem-跨端共享]]。
 
@@ -343,7 +343,7 @@ DSH 装好后同样做一遍,并验证跨来源召回。旧笔记提到可打开
 |---|---|
 | `--ide <id>` | 指定 IDE,如 `opencode`、`dsh`、`claude-code`、`cursor` |
 | `--dsh-profile <name>` | DSH 的 profile,默认 `web` |
-| `--provider <name>` | `claude` / `codex` / `gemini` / `openrouter` / `host`(`openai-compatible` 不走安装器,见 3.6 节) |
+| `--provider <name>` | `claude` / `codex` / `gemini` / `openrouter` / `host`(`host` 需要本机已有兼容服务,对 OpenCode/DSH 不推荐;`openai-compatible` 不走安装器,见 3.6 节) |
 | `--model <id>` | 指定模型 |
 | `--no-auto-start` | 安装结束不自动启动 worker |
 | `--disable-auto-memory` | 显式禁用 Claude Code 原生自动记忆 |
@@ -424,10 +424,10 @@ npx claude-mem restore <file>   # 恢复
 
 1. **`opencode.jsonc` 与 `opencode.json` 并存是否冲突**:源码只读写 `opencode.json`,对 `opencode.jsonc` 没有检测和处理;并存后 OpenCode 本身怎么加载,**未证实**。
 2. **`CLAUDE_MEM_ONLINE_OPTIN=false` 是否有效**:源码中没找到处理该变量的逻辑,**未证实有效**,与旧笔记结论冲突。
-3. **非交互安装的细节**:`--provider openrouter` 非交互时是否还要额外参数,**未验证**;"需要 API key 或 `--provider host`"是源码推断。
+3. **非交互安装的细节**:`--provider openrouter` 非交互时是否还要额外参数,**未验证**;"需要 API key 或 `--provider claude`"是源码推断。
 4. **不登录时安装器会不会因联网失败而中断**:**未验证**,更新日志的说法可能只针对 cmem 提供方。
 5. **DSH 侧**:没看到直接操作 `cordis.patch.yml`,而是委托 `dsh plugin ... add`;DSH 最终改了哪些文件,没读到。旧笔记的说法不采用。
-6. **`host` 提供方**在 OpenCode、DSH 上的笔记质量,没读到。
+6. **`host` 提供方**:已读源码确认它依赖本机已在运行的兼容服务,装不上就报错;但 OpenCode、DSH 上有没有现成组件充当这个服务,没读到,只能说大概率没有。
 7. **观察者接 codebuddy**:没实测,理论可行。
 8. **`/viewer` 的具体地址、日志位置**:没读到。worker 端口键已确认是 `CLAUDE_MEM_WORKER_PORT`,默认 `37700 + (uid % 100)`。
 9. **`repair`、`prune`、`search`、`teambrain` 等命令的细节参数**:没读到。

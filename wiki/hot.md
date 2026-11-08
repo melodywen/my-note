@@ -7,6 +7,7 @@ updated: 2026-11-08
 # 最近上下文 (Hot Cache)
 
 ## 最近更新
+2026-11-08。claude-mem 五篇文档齐了(新增 [[claude-mem-存储与读取机制]]、[[claude-mem-跨端共享]]);订正:`--provider host` 要本机已有兼容服务、安装器不起,对 OpenCode/DSH 大概率不可用,首次安装改用 `claude`;DSH 有官方集成,写入来源名按源码推为 `dsh`;均未实测,下一步是装机实测与 codebuddy 地址。
 2026-11-08。opencode-mem 已从本机卸载(插件配置、数据目录、缓存全删,未备份);记忆方案改看 claude-mem / memsearch。
 2026-11-08。新增 claude-mem 学习文档三篇:[[claude-mem-配置详解]]、[[claude-mem-安装部署]]、[[claude-mem-调教清单]];接 codebuddy 优先用 `openai-compatible`,`SEARCH_RECENCY_DAYS` 默认 90 天会让旧记忆搜不到;存储与读取、跨端共享两篇待写;均未实测。
 2026-11-08。新增 [[OpenCode与DSH共享记忆-选型调研]] 与 [[claude-mem-深入调研]]:claude-mem 领先(安装时须避开云登录与托管观察者,默认向量嵌入是英文模型);memsearch 架构最贴合但仅 2.8k 星;均未实测。

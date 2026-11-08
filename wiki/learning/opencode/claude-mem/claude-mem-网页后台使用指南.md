@@ -21,21 +21,21 @@ related:
 
 # claude-mem 网页后台使用指南
 
-> 一句话:**worker 进程自带一个网页,打开 `http://127.0.0.1:37701/viewer` 就能看记忆、改设置、看日志。它没有任何新手引导,这篇补上。**
+> 一句话:**worker 进程自带一个网页,打开 [http://127.0.0.1:37701/viewer](http://127.0.0.1:37701/viewer) 就能看记忆、改设置、看日志。它没有任何新手引导,这篇补上。**
 
-> 证据说明:界面功能来自 `src/ui/viewer/` 的前端源码和本机接口实测(`/api/stats`、`/api/projects`、`/api/processing-status`),以及一张你截的 `/viewer#/sessions` 截图。**我没有看过每个弹窗渲染出来的样子**,标"未证实"的地方是从源码推的。
+> 证据说明:界面功能来自 `src/ui/viewer/` 的前端源码和本机接口实测([/api/stats](http://127.0.0.1:37701/api/stats)、[/api/projects](http://127.0.0.1:37701/api/projects)、[/api/processing-status](http://127.0.0.1:37701/api/processing-status)),以及一张你截的 `/viewer#/sessions` 截图。**我没有看过每个弹窗渲染出来的样子**,标"未证实"的地方是从源码推的。
 
 ## 1. 先认地址
 
 | 地址                                             | 是什么                      | 现在对你有用吗                                      |
 | ---------------------------------------------- | ------------------------ | -------------------------------------------- |
-| `http://127.0.0.1:37701/viewer`                | **记忆查看器**,看记忆、改设置、看日志都在这 | 有用,本篇主角                                      |
-| `http://127.0.0.1:37701/`                      | "My Work" 工作看板,按"请求"分组   | 暂时用处不大。源码里它的 README 自称"线框加示例数据",偏任务管理,不是记忆本身 |
-| `http://127.0.0.1:37701/tv`                    | 流式展示页(对应 `/stream`)      | 没读它做什么,先不管                                   |
-| `http://127.0.0.1:37701/api/health`            | 健康检查,返回 JSON             | 排错时用                                         |
-| `http://127.0.0.1:37701/api/stats`             | 统计:观察数、会话数、数据库大小         | 排错时用                                         |
-| `http://127.0.0.1:37701/api/projects`          | 已登记的项目和来源                | 排错时用                                         |
-| `http://127.0.0.1:37701/api/processing-status` | 观察者是否在处理、队列积压数           | 排错时用                                         |
+| [/viewer](http://127.0.0.1:37701/viewer)                | **记忆查看器**,看记忆、改设置、看日志都在这 | 有用,本篇主角                                      |
+| [/](http://127.0.0.1:37701/)                      | "My Work" 工作看板,按"请求"分组   | 暂时用处不大。源码里它的 README 自称"线框加示例数据",偏任务管理,不是记忆本身 |
+| [/tv](http://127.0.0.1:37701/tv)                    | 流式展示页(对应 `/stream`)      | 没读它做什么,先不管                                   |
+| [/api/health](http://127.0.0.1:37701/api/health)            | 健康检查,返回 JSON             | 排错时用                                         |
+| [/api/stats](http://127.0.0.1:37701/api/stats)             | 统计:观察数、会话数、数据库大小         | 排错时用                                         |
+| [/api/projects](http://127.0.0.1:37701/api/projects)          | 已登记的项目和来源                | 排错时用                                         |
+| [/api/processing-status](http://127.0.0.1:37701/api/processing-status) | 观察者是否在处理、队列积压数           | 排错时用                                         |
 
 三点要知道:
 
@@ -54,7 +54,7 @@ related:
 | 免费试用 30 天 | CMEM Pro 的推广按钮 | **不是限制**,不点不影响。详见第 7 节 |
 | TeamBrain | 另一个官方云服务的推广链接 | 同上,只在本机没加入任何团队时显示 |
 | Feed connected / Cloud freshness unknown | 左半句:网页和本机 worker 的实时连接;右半句:云同步状态 | `Feed connected` 是正常。`Cloud freshness unknown` 是因为没用云同步,不是错误(云同步字段在 `settings.json` 里是空的) |
-| 书、X、Discord、GitHub 图标 | 官方文档、推特、社区、仓库的外链 | 文档地址是 `https://docs.claude-mem.ai` |
+| 书、X、Discord、GitHub 图标 | 官方文档、推特、社区、仓库的外链 | 文档地址是 [https://docs.claude-mem.ai](https://docs.claude-mem.ai) |
 | 所有项目 | 按项目过滤的下拉框 | 选 `my-note` 就只看这个项目 |
 | English / 简体中文 | 界面语言 | 改后保存在浏览器里 |
 | 主题切换 | 亮色、暗色、跟随系统 | 随意 |
@@ -81,7 +81,7 @@ related:
 - 点卡片或卡片菜单里的"打开",进入会话详情页(地址是 `#/sessions/...`),顶部有"返回会话"。
 - 卡片菜单里还有"删除"。
 
-**坑:这个"N 条记忆"数得不准。** 你截图里是 12 条,但我查数据库,真正的观察(observations)是 0 条,你的提问原文(user_prompts)有 13 条。所以这个数很可能把**提问**也算进去了。这是我的推测,没读到计数函数。判断记忆有没有真的生成,看 `/api/stats` 里的 `observations`,别看这个数。
+**坑:这个"N 条记忆"数得不准。** 你截图里是 12 条,但我查数据库,真正的观察(observations)是 0 条,你的提问原文(user_prompts)有 13 条。所以这个数很可能把**提问**也算进去了。这是我的推测,没读到计数函数。判断记忆有没有真的生成,看 [/api/stats](http://127.0.0.1:37701/api/stats) 里的 `observations`,别看这个数。
 
 ### 3.2 时间线
 
@@ -192,13 +192,13 @@ npx claude-mem restart
 
 | 项 | 值 | 来源 |
 |---|---|---|
-| 观察(observations) | 0 | `/api/stats` 和直接查库 |
+| 观察(observations) | 0 | [/api/stats](http://127.0.0.1:37701/api/stats) 和直接查库 |
 | 总结 | 0 | 同上 |
 | 会话 | 1 | 同上 |
 | 你的提问原文 | 13 | 直接查 `user_prompts` 表 |
-| 项目 | `my-note` | `/api/projects` |
-| 来源 | `opencode` | `/api/projects` |
-| 队列积压 | 11 | `/api/processing-status` |
+| 项目 | `my-note` | [/api/projects](http://127.0.0.1:37701/api/projects) |
+| 来源 | `opencode` | [/api/projects](http://127.0.0.1:37701/api/projects) |
+| 队列积压 | 11 | [/api/processing-status](http://127.0.0.1:37701/api/processing-status) |
 
 **这组数字说明什么**:
 
@@ -213,7 +213,7 @@ npx claude-mem restart
 | 项 | 情况 |
 |---|---|
 | 许可证 | Apache-2.0(`LICENSE`、`package.json`),开源,本地运行,无时限 |
-| 这个按钮 | 推广 **CMEM Pro**(官方付费托管服务)的位置。点了打开 `https://cmem.ai/pro?from=viewer`。卖点文案是"记忆走它的服务,不占你的套餐额度,套餐用量最多提升 100%" |
+| 这个按钮 | 推广 **CMEM Pro**(官方付费托管服务)的位置。点了打开 [https://cmem.ai/pro?from=viewer](https://cmem.ai/pro?from=viewer)。卖点文案是"记忆走它的服务,不占你的套餐额度,套餐用量最多提升 100%" |
 | 对你的影响 | 我读到的只有文案和链接,没有读到"到期后停用本地功能"的代码 |
 
 推广还会出现在会话开头的横幅、安装器提示里(源码 `pro-promo.ts` 注释列了五处)。**关掉推广的开关我没查**。
@@ -224,8 +224,8 @@ npx claude-mem restart
 
 | 想做的事 | 去哪 | 怎么做 |
 |---|---|---|
-| 确认记忆有没有在写 | `/viewer` 时间线 | 在 OpenCode 里干几轮活,刷新页面,看有没有新的观察卡片(现在会是空) |
-| 观察者坏了查原因 | 日志抽屉,或 `/api/health` | 级别选 Error,看 `dependencies` 里的 `claude_cli` 之类的提示 |
+| 确认记忆有没有在写 | [/viewer](http://127.0.0.1:37701/viewer) 时间线 | 在 OpenCode 里干几轮活,刷新页面,看有没有新的观察卡片(现在会是空) |
+| 观察者坏了查原因 | 日志抽屉,或 [/api/health](http://127.0.0.1:37701/api/health) | 级别选 Error,看 `dependencies` 里的 `claude_cli` 之类的提示 |
 | 调一次注入多少记忆 | 齿轮、加载分区 | 先看"已保存上下文预览"确认效果,再保存 |
 | 删一条不想要的记忆 | 时间线卡片右上角 | 点删除并确认,**不可撤销** |
 | 换观察者的模型 | 齿轮、高级分区 | 提供方选 OpenAI 兼容,预设选 custom,填地址和模型,key 放 `.env` 或 `settings.json` |
@@ -243,8 +243,8 @@ npx claude-mem restart
 
 ## 10. 下一步
 
-1. 先打开 `/viewer`,点齿轮,看"高级"分区的真实样子,把和本文不符的地方告诉我,我来订正。
+1. 先打开 [/viewer](http://127.0.0.1:37701/viewer),点齿轮,看"高级"分区的真实样子,把和本文不符的地方告诉我,我来订正。
 2. 拿到 codebuddy 的 OpenAI 兼容地址和模型名后,可以在网页里填(预设选 custom),也可以我直接改 `settings.json`,密钥放 `.env`。
-3. 配好后重启 worker,观察 `/api/stats` 里 `observations` 是否从 0 开始增长,同时队列积压数是否下降。
+3. 配好后重启 worker,观察 [/api/stats](http://127.0.0.1:37701/api/stats) 里 `observations` 是否从 0 开始增长,同时队列积压数是否下降。
 
 相关:[[claude-mem-安装部署]]、[[claude-mem-调教清单]]、[[claude-mem-存储与读取机制]]。

@@ -63,6 +63,11 @@ updated: 2026-08-14
 **🧠 OpenCode 记忆插件**
 1. [[opencode-mem-调研与上手指南]](opencode-mem 的检索、冲突与迭代、安装配置)
 2. [[opencode-mem-值得调整的配置]](装好后哪些配置值得调,按优先级排序)
+3. [[OpenCode与DSH共享记忆-选型调研]](OpenCode 与 DSH 共用记忆的候选对比与推荐排序,1 万星起步)
+4. [[claude-mem-深入调研]](claude-mem 的优势、部署、数据外发、云本地差异、检索与中文)
+5. [[claude-mem-配置详解]](238 个配置键分 20 组逐项注释,附完整默认 JSON)
+6. [[claude-mem-安装部署]](安装器行为、命令、改动、排错、云登录与外发风险)
+7. [[claude-mem-调教清单]](约 40 个值得调的键,按 8 轮由浅入深,含验证与回退)
 
 **🗂️ Obsidian（工具）**
 1. [[Obsidian 命令与技能完全指南]] — Obsidian 命令体系 + claude-obsidian 14 个 AI 技能

@@ -10,6 +10,18 @@ updated: 2026-11-05
 
 ---
 
+## [2026-11-08] create | claude-mem 学习文档(配置详解、安装部署、调教清单)
+
+- 新增 `learning/opencode/claude-mem/` 三篇:[[claude-mem-配置详解]](238 键分 20 组,逐键注释,来自源码 DEFAULTS)、[[claude-mem-安装部署]]、[[claude-mem-调教清单]](分 8 轮调教)。
+- 修正旧结论:键数 238 而非 119;接 codebuddy 优先用 `openai-compatible`;`EMBEDDING_MODEL` 仅服务器模式生效,本机中文向量召回短板仍在;`SEARCH_RECENCY_DAYS` 默认 90 天会让旧记忆搜不到。
+- 存储与读取机制、跨端共享两篇尚未写,调研进行中。均未实测。
+
+---
+
+## [2026-11-08] create | OpenCode 与 DSH 共享记忆选型调研(两篇)
+- 新增 [[OpenCode与DSH共享记忆-选型调研]](候选总表、推荐排序、淘汰理由、证据质量说明、未验证项)与 [[claude-mem-深入调研]](优势、部署、数据外发三条路径、云本地差异、检索架构与中文)。位于 `learning/opencode/记忆方案选型/`。
+- 结论:claude-mem 领先;memsearch 架构最贴合但仅 2.8k 星。全部基于读源码与文档,未做实测。
+
 ## [2026-11-05] update | opencode-mem 固定摘要语言并清理
 - 实测 `glm-5.2` 在 `autoCaptureLanguage: "auto"` 下把中文对话的摘要写成瑞典语、罗马尼亚语、克罗地亚语、索马里语、法语。本机固定为 `"zh"`,更新 [[opencode-mem-值得调整的配置]](第 11 节、"看情况"表、JSON 示例)。
 - 清理:删掉 37 条缺 `promptId` 的自动捕获记忆(软删除,可从回收站恢复),网页 20 页逐页翻通过,无 `each_key_duplicate`;另删 2 条过时摘要(索马里语、法语)、本地 `opencode-mem-vault` 目录、旧 nomic 嵌入模型缓存(约 523MB)。

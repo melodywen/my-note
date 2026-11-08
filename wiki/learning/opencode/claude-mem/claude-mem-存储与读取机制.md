@@ -83,13 +83,13 @@ Chroma 开着(默认开)?  --否-->  只走 SQLite:
 
 ### 各环节对照表
 
-| 环节 | 谁负责 | 能不能搜中文 | 源码位置 |
-|---|---|---|---|
-| 存完整内容 | SQLite `observations` 表 | 不涉及搜索 | SessionStore.ts 约 1299、1876 行 |
-| 关键词索引 | FTS5 `observations_fts` | 不能(不切汉字) | SessionSearch.ts 约 256、416 行 |
-| 汉字关键词补救 | 多列 LIKE 子串匹配 | 能,但不按相关度排 | SessionSearch.ts `buildSubstringClause` 约 444 行 |
-| 按意思找 | Chroma + 默认英文模型 | 弱(见第六节) | models.ts 头部注释;ChromaSync.ts 约 1985 行 |
-| 结果拼装与补查 | SearchOrchestrator / SearchManager | 取决于上面各层 | SearchOrchestrator.ts 约 107-226 行 |
+| 环节      | 谁负责                                | 能不能搜中文    | 源码位置                                            |
+| ------- | ---------------------------------- | --------- | ----------------------------------------------- |
+| 存完整内容   | SQLite `observations` 表            | 不涉及搜索     | SessionStore.ts 约 1299、1876 行                   |
+| 关键词索引   | FTS5 `observations_fts`            | 不能(不切汉字)  | SessionSearch.ts 约 256、416 行                    |
+| 汉字关键词补救 | 多列 LIKE 子串匹配                       | 能,但不按相关度排 | SessionSearch.ts `buildSubstringClause` 约 444 行 |
+| 按意思找    | Chroma + 默认英文模型                    | 弱(见第六节)   | models.ts 头部注释;ChromaSync.ts 约 1985 行           |
+| 结果拼装与补查 | SearchOrchestrator / SearchManager | 取决于上面各层   | SearchOrchestrator.ts 约 107-226 行               |
 
 ---
 
@@ -216,25 +216,25 @@ Chroma 用一次"全类型取前 N"的查询,所以某一类可能被别的类�
 
 ### 6.1 原因(每条标明证据类型)
 
-| 短板 | 说明 | 证据类型 |
-|---|---|---|
-| 向量层默认模型是英文的 | 默认嵌入模型 `all-MiniLM-L6-v2` 是"仅英文"的,它约 3 万词的词表会把中日韩文字切成单字或 `[UNK]`(未知符号),这是源码里提到的"中日韩召回缺口"的来源(#3422、#3982) | 源码注释:models.ts 约 1-13 行 |
+| 短板                   | 说明                                                                                                                 | 证据类型                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| 向量层默认模型是英文的          | 默认嵌入模型 `all-MiniLM-L6-v2` 是"仅英文"的,它约 3 万词的词表会把中日韩文字切成单字或 `[UNK]`(未知符号),这是源码里提到的"中日韩召回缺口"的来源(#3422、#3982)           | 源码注释:models.ts 约 1-13 行                                                                           |
 | 本地 Chroma 默认用的就是这个模型 | `CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION` 默认 `'default'`,注释写"是本地的 all-MiniLM-L6-v2(偏英文)";models.ts 也写"它是 Chroma 原来用的" | 源码注释:SettingsDefaultsManager.ts 约 669-675 行;models.ts 约 5 行。未实测 chroma-mcp 的 default 到底加载了什么(未证实) |
-| 关键词层不切汉字 | FTS5 `unicode61` 把连续汉字当一个词,所以含汉字查询干脆不走 FTS5 | 源码:SessionSearch.ts 约 396-416、768 行,含源码内的实测数字 |
-| 降级后不排序且要求连续 | 子串匹配只看"含不含",按时间倒序,长句要原样连续出现 | 源码:SessionSearch.ts 约 444-459、674-677 行 |
-| "汉字查询被用户提问挤掉观察" | 源码自己承认存在,并用空类别补查缓解 | 源码注释:SearchOrchestrator.ts 约 157-158 行 |
+| 关键词层不切汉字             | FTS5 `unicode61` 把连续汉字当一个词,所以含汉字查询干脆不走 FTS5                                                                        | 源码:SessionSearch.ts 约 396-416、768 行,含源码内的实测数字                                                     |
+| 降级后不排序且要求连续          | 子串匹配只看"含不含",按时间倒序,长句要原样连续出现                                                                                        | 源码:SessionSearch.ts 约 444-459、674-677 行                                                           |
+| "汉字查询被用户提问挤掉观察"      | 源码自己承认存在,并用空类别补查缓解                                                                                                 | 源码注释:SearchOrchestrator.ts 约 157-158 行                                                            |
 
 ### 6.2 补救办法
 
-| 办法 | 怎么做 | 依据 | 效果 |
-|---|---|---|---|
-| 搜中文时用短关键词 | 2-4 个字的词,多个词用空格隔开;不要整句 | 源码行为(5.4 节 `buildSubstringClause`) | 逻辑上成立,未实测 |
-| 取消 90 天窗口 | `CLAUDE_MEM_SEARCH_RECENCY_DAYS` 设为 `0`,重启 worker | 源码:types.ts 约 24-37 行 | 只解决"老记忆被过滤",不解决中文向量质量 |
-| 搜索时直接给日期范围 | 传 `dateStart/dateEnd`,窗口不再生效 | 源码:ChromaSearchStrategy.ts 约 221-230 行 | 同上 |
-| 完全关掉 Chroma,只用 SQLite | `CLAUDE_MEM_CHROMA_ENABLED=false` | 源码:DatabaseManager.ts 约 93 行;SearchOrchestrator.ts 约 147-152 行 | 中文变成纯子串匹配(稳定、按时间排),但英文也失去"按意思找"。哪个更适合你,没测过(未证实) |
-| 换 Chroma 的嵌入函数 | `CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION` 可选 `openai/cohere/jina/voyageai/roboflow`,只对新集合生效、要重建索引,记忆文字会发给厂商、需要 API key | 源码注释:SettingsDefaultsManager.ts 约 669-675 行 | 这些模型对中文是否更好:推断(云端通用模型通常多语言),**未证实**;而且有隐私成本 |
-| 换成多语言嵌入模型 | 仅服务器模式可用:`CLAUDE_MEM_EMBEDDING_MODEL` 可选 `paraphrase-multilingual-MiniLM-L12-v2`、`multilingual-e5-small`、`granite-embedding-97m-multilingual-r2`(models.ts 约 37-80 行白名单,未知名字会报错,约 85-93 行) | 源码 | 本机默认路径**用不上**(见第七节)。源码称这三个多语言候选在外部项目 `rich-murphey/claude-mem-search-eval` 里测过,我没读,结论**未证实** |
-| 让观察里带英文关键词 | 例如在 CLAUDE.md 或提示里要求观察的标题/事实保留英文术语 | 推断:英文模型对英文词更敏感;`plugin/modes/` 里有 `code--zh.json` 等语言模式,`CLAUDE_MEM_MODE` 默认 `code`(SettingsDefaultsManager.ts 约 607 行) | 推断。我没读 `code--zh.json` 的内容,不知道它是否让观察用中文写(未证实) |
+| 办法                    | 怎么做                                                                                                                                                                                        | 依据                                                                                                                      | 效果                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 搜中文时用短关键词             | 2-4 个字的词,多个词用空格隔开;不要整句                                                                                                                                                                     | 源码行为(5.4 节 `buildSubstringClause`)                                                                                      | 逻辑上成立,未实测                                                                                    |
+| 取消 90 天窗口             | `CLAUDE_MEM_SEARCH_RECENCY_DAYS` 设为 `0`,重启 worker                                                                                                                                          | 源码:types.ts 约 24-37 行                                                                                                   | 只解决"老记忆被过滤",不解决中文向量质量                                                                        |
+| 搜索时直接给日期范围            | 传 `dateStart/dateEnd`,窗口不再生效                                                                                                                                                               | 源码:ChromaSearchStrategy.ts 约 221-230 行                                                                                  | 同上                                                                                           |
+| 完全关掉 Chroma,只用 SQLite | `CLAUDE_MEM_CHROMA_ENABLED=false`                                                                                                                                                          | 源码:DatabaseManager.ts 约 93 行;SearchOrchestrator.ts 约 147-152 行                                                          | 中文变成纯子串匹配(稳定、按时间排),但英文也失去"按意思找"。哪个更适合你,没测过(未证实)                                              |
+| 换 Chroma 的嵌入函数        | `CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION` 可选 `openai/cohere/jina/voyageai/roboflow`,只对新集合生效、要重建索引,记忆文字会发给厂商、需要 API key                                                                        | 源码注释:SettingsDefaultsManager.ts 约 669-675 行                                                                             | 这些模型对中文是否更好:推断(云端通用模型通常多语言),**未证实**;而且有隐私成本                                                  |
+| 换成多语言嵌入模型             | 仅服务器模式可用:`CLAUDE_MEM_EMBEDDING_MODEL` 可选 `paraphrase-multilingual-MiniLM-L12-v2`、`multilingual-e5-small`、`granite-embedding-97m-multilingual-r2`(models.ts 约 37-80 行白名单,未知名字会报错,约 85-93 行) | 源码                                                                                                                      | 本机默认路径**用不上**(见第七节)。源码称这三个多语言候选在外部项目 `rich-murphey/claude-mem-search-eval` 里测过,我没读,结论**未证实** |
+| 让观察里带英文关键词            | 例如在 CLAUDE.md 或提示里要求观察的标题/事实保留英文术语                                                                                                                                                         | 推断:英文模型对英文词更敏感;`plugin/modes/` 里有 `code--zh.json` 等语言模式,`CLAUDE_MEM_MODE` 默认 `code`(SettingsDefaultsManager.ts 约 607 行) | 推断。我没读 `code--zh.json` 的内容,不知道它是否让观察用中文写(未证实)                                                |
 
 ---
 

@@ -7,6 +7,7 @@ updated: 2026-11-08
 # 最近上下文 (Hot Cache)
 
 ## 最近更新
+2026-11-08。claude-mem 已装机(OpenCode 插件自动加载生效,worker 在 37701),新增 [[claude-mem-网页后台使用指南]]:`/viewer` 是记忆查看器,"30 天试用"只是 CMEM Pro 推广位;观察者仍因没配 codebuddy 不工作(观察 0、积压 11),待补地址和模型名;配置仓库已推 `a031a21`,`plugins/claude-mem.js` 已 gitignore。
 2026-11-08。claude-mem 五篇文档齐了(新增 [[claude-mem-存储与读取机制]]、[[claude-mem-跨端共享]]);订正:`--provider host` 要本机已有兼容服务、安装器不起,对 OpenCode/DSH 大概率不可用,首次安装改用 `claude`;DSH 有官方集成,写入来源名按源码推为 `dsh`;均未实测,下一步是装机实测与 codebuddy 地址。
 2026-11-08。opencode-mem 已从本机卸载(插件配置、数据目录、缓存全删,未备份);记忆方案改看 claude-mem / memsearch。
 2026-11-08。新增 claude-mem 学习文档三篇:[[claude-mem-配置详解]]、[[claude-mem-安装部署]]、[[claude-mem-调教清单]];接 codebuddy 优先用 `openai-compatible`,`SEARCH_RECENCY_DAYS` 默认 90 天会让旧记忆搜不到;存储与读取、跨端共享两篇待写;均未实测。

@@ -10,6 +10,10 @@ updated: 2026-11-08
 
 ---
 
+## [2026-11-08] create | claude-mem 网页后台使用指南,并记录装机实测
+
+新增 [[claude-mem-网页后台使用指南]]。来自 `src/ui/viewer/` 前端源码和本机接口:`/viewer` 才是记忆查看器,`/` 是 My Work 看板;齿轮设置与 `settings.json` 同源,OpenAI 兼容端点的 key 不能在网页填,只能放 `settings.json` 或 `.env`;"免费试用 30 天"是 CMEM Pro 推广位,本地版 Apache-2.0 无时限。装机实测:OpenCode 插件被自动加载(来源 `opencode` 已登记,提问原文 13 条入库);观察 0 条、队列积压 11,观察者因找不到 `claude` 未工作;"N 条记忆"疑似把提问也计入,未读计数函数。界面渲染、保存是否保持软链、`.env` 优先级均未实测。
+
 ## [2026-11-08] create | claude-mem 存储与读取机制、跨端共享,并订正 host 提供方
 
 新增 [[claude-mem-存储与读取机制]]、[[claude-mem-跨端共享]]。跨端调研(lib-2)有三处与源码不符,已按源码改正:DSH 有官方集成(`--ide dsh`,`@claude-mem/dsh`,靠 worker 监听 `~/.dsh/sessions` 写入),`INCLUDE_ALL_SOURCES` 存在且 OpenCode 插件也读,OpenCode 注入走系统提示词钩子而非 `AGENTS.md`。订正 `--provider host`:它要求本机已有兼容服务、安装器不会起,是为 Grok Bot/Cursor 设计,对 OpenCode/DSH 大概率不可用;安装部署、调教清单、配置详解里"首次先用 host"的建议改为先用 `claude` 再改 codebuddy。均未实测。

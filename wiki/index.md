@@ -70,6 +70,7 @@ updated: 2026-08-14
 7. [[claude-mem-调教清单]](约 40 个值得调的键,按 8 轮由浅入深,含验证与回退)
 8. [[claude-mem-存储与读取机制]](记忆怎么存进 SQLite 和 Chroma、怎么检索、中文为什么搜不准)
 9. [[claude-mem-跨端共享]](OpenCode 与 DSH 怎么共用一份记忆:项目名、来源过滤、安装顺序)
+10. [[claude-mem-网页后台使用指南]](37701 端口网页后台怎么用:顶栏、时间线、设置弹窗、日志、30 天试用按钮的真相)
 
 **🗂️ Obsidian（工具）**
 1. [[Obsidian 命令与技能完全指南]] — Obsidian 命令体系 + claude-obsidian 14 个 AI 技能

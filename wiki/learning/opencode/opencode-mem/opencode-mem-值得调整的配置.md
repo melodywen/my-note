@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "opencode-mem 值得调整的配置"
 created: 2026-11-05
-updated: 2026-11-05
+updated: 2026-11-08
 tags:
   - learning
   - opencode
@@ -15,6 +15,8 @@ related:
 ---
 
 # opencode-mem 值得调整的配置
+
+> **状态更新(2026-11-08):已从本机卸载。** 已摘掉 `opencode.jsonc` 里的 `opencode-mem@2.41.0`,删除 `~/.config/opencode/opencode-mem.jsonc`、`~/.opencode-mem`(含 2.5G 嵌入模型和全部记忆数据,未备份)、`~/.cache/opencode/npm/opencode-mem@2.41.0`、`~/ai-work/opencode-mem-vault`。下文是卸载前的调研记录,路径与现状不再对应,仅供参考。
 
 > 配置项有上百个,**绝大多数不用碰**。本文只挑真正影响效果、成本、隐私的那些,按"必须改 → 建议改 → 看情况 → 不用管"排序。
 >

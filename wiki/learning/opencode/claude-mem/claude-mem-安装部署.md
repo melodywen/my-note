@@ -105,14 +105,14 @@ claude-mem 和 opencode-mem 并存会**重复注入**上下文。测试期间先
 
 观察者每次工具调用都会被调用,持续有成本。选择决策表:
 
-| provider | 要 key 吗 | 会联网登录 claude-mem 账号吗 | 适合谁 |
-|---|---|---|---|
-| `claude` | 用已登录的 Claude CLI | 不需要 | 本机已有 Claude 订阅或登录 |
-| `codex` | 用已登录的 Codex | 不需要 | 本机已有 Codex |
-| `gemini` | 要 | **交互模式默认引导浏览器登录 cmem.ai** | 想用 Gemini 且接受登录 |
-| `openrouter` | 要(如 `OPENROUTER_API_KEY`) | **交互模式默认引导浏览器登录 cmem.ai** | 想后续把 `BASE_URL` 改成 codebuddy 的人 |
-| `openai-compatible` | 要 | **不会**(安装器没有它的流程) | 要接 codebuddy 等自定义地址:装完手改 `settings.json` |
-| `host` | 不要 | 不需要 | 让宿主 agent 自己写笔记,最省事 |
+| provider            | 要 key 吗                   | 会联网登录 claude-mem 账号吗      | 适合谁                                      |
+| ------------------- | ------------------------- | ------------------------- | ---------------------------------------- |
+| `claude`            | 用已登录的 Claude CLI          | 不需要                       | 本机已有 Claude 订阅或登录                        |
+| `codex`             | 用已登录的 Codex               | 不需要                       | 本机已有 Codex                               |
+| `gemini`            | 要                         | **交互模式默认引导浏览器登录 cmem.ai** | 想用 Gemini 且接受登录                          |
+| `openrouter`        | 要(如 `OPENROUTER_API_KEY`) | **交互模式默认引导浏览器登录 cmem.ai** | 想后续把 `BASE_URL` 改成 codebuddy 的人          |
+| `openai-compatible` | 要                         | **不会**(安装器没有它的流程)         | 要接 codebuddy 等自定义地址:装完手改 `settings.json` |
+| `host`              | 不要                        | 不需要                       | 让宿主 agent 自己写笔记,最省事                      |
 
 要点:
 

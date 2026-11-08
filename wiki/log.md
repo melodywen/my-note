@@ -1,7 +1,7 @@
 ---
 type: meta
 title: "Log"
-updated: 2026-11-05
+updated: 2026-11-08
 ---
 
 # 操作日志 (Log)
@@ -9,6 +9,10 @@ updated: 2026-11-05
 仅追加。新条目放在最上方。永不修改历史条目。
 
 ---
+
+## [2026-11-08] remove | 卸载 opencode-mem
+
+摘除插件配置,删除全局配置、数据目录 `~/.opencode-mem`、npm 缓存和旧 markdown 库;未备份记忆数据。相关两篇笔记已加卸载说明。
 
 ## [2026-11-08] create | claude-mem 学习文档(配置详解、安装部署、调教清单)
 

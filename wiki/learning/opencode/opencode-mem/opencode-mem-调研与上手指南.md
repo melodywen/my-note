@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "opencode-mem 调研与上手指南"
 created: 2026-11-05
-updated: 2026-11-05
+updated: 2026-11-08
 tags:
   - learning
   - opencode
@@ -17,6 +17,8 @@ related:
 ---
 
 # opencode-mem 调研与上手指南
+
+> **状态更新(2026-11-08):已从本机卸载。** 已摘掉 `opencode.jsonc` 里的 `opencode-mem@2.41.0`,删除 `~/.config/opencode/opencode-mem.jsonc`、`~/.opencode-mem`(含 2.5G 嵌入模型和全部记忆数据,未备份)、`~/.cache/opencode/npm/opencode-mem@2.41.0`、`~/ai-work/opencode-mem-vault`。下文是卸载前的调研记录,路径与现状不再对应,仅供参考。
 
 > 一句话:**opencode-mem 是给 OpenCode 装的"长期记忆"插件。你正常干活,它在后台把值得记的东西存到本机,下次聊天时把相关的几条自动塞回上下文。**
 >

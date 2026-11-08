@@ -1,12 +1,13 @@
 ---
 type: meta
 title: "Hot Cache"
-updated: 2026-11-05
+updated: 2026-11-08
 ---
 
 # 最近上下文 (Hot Cache)
 
 ## 最近更新
+2026-11-08。opencode-mem 已从本机卸载(插件配置、数据目录、缓存全删,未备份);记忆方案改看 claude-mem / memsearch。
 2026-11-08。新增 claude-mem 学习文档三篇:[[claude-mem-配置详解]]、[[claude-mem-安装部署]]、[[claude-mem-调教清单]];接 codebuddy 优先用 `openai-compatible`,`SEARCH_RECENCY_DAYS` 默认 90 天会让旧记忆搜不到;存储与读取、跨端共享两篇待写;均未实测。
 2026-11-08。新增 [[OpenCode与DSH共享记忆-选型调研]] 与 [[claude-mem-深入调研]]:claude-mem 领先(安装时须避开云登录与托管观察者,默认向量嵌入是英文模型);memsearch 架构最贴合但仅 2.8k 星;均未实测。
 2026-11-05。opencode-mem 摘要语言本机固定为 `zh`(glm-5.2 在 auto 下会写成瑞典语/索马里语/法语等),见 [[opencode-mem-值得调整的配置]] 第 11 节;缺 `promptId` 的 37 条老记忆已清,网页恢复。

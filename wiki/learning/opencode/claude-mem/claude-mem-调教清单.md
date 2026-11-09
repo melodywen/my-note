@@ -63,7 +63,7 @@ npx claude-mem restart
 | 第 2 轮 | 隐私:不泄密、不外发、不存图 | 7 | 必改 | 已做,脱敏已验证 |
 | 第 3 轮 | 采集:什么该记、什么不该记 | 6 | 建议 | 已做,仅 SKIP_TOOLS 有效,其余 5 键在 OpenCode 下无效或暂不需要 |
 | 第 4 轮 | 注入:开会话时塞多少旧记忆 | 6 | 建议 | 已测,保持默认,一个键都没改 |
-| 第 5 轮 | 检索:中文召回与 90 天窗口 | 4 | 建议 | 已做:`SEARCH_RECENCY_DAYS` 改为 `0`,其余 3 键保持默认;之后又上线本地 bge-m3 向量(及格非达标,见[[claude-mem-本地多语言向量方案]]) |
+| 第 5 轮 | 检索:中文召回与 90 天窗口 | 4 | 已完成 | 已做:`SEARCH_RECENCY_DAYS` 改为 `0`,其余 3 键保持默认;之后又上线本地 bge-m3 向量(及格非达标,见[[claude-mem-本地多语言向量方案]]) |
 | 第 6 轮 | 跨端:OpenCode 与 DSH 共用 | 3 | 必改(若要共用) | 未做 |
 | 第 7 轮 | 运维:备份、日志、清理 | 6 | 可选 | 未做 |
 | 附 | 先别碰的键 | | 观察 | 未做 |
@@ -361,14 +361,14 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 
 ### 键
 
-| 键 | 默认 | 说明 | 调法 |
-|---|---|---|---|
-| `CONTEXT_OBSERVATIONS` | `50` | 最多注入多少条观察。校验范围 0 到 200,取最近的 N 条 | 嫌上下文太满就降到 20 到 30;想要更多历史就升 |
-| `CONTEXT_SESSION_COUNT` | `10` | 显示最近多少次"会话总结" | 一般不动。上下文超预算时会被减半 |
-| `CONTEXT_FULL_COUNT` | `0` | 最近前 N 条除了标题还展开详细内容。0 = 全只显示标题 | 想让最近几条更详细可设 3 到 5。上下文瘦身时它最先被砍 |
-| `CONTEXT_FULL_FIELD` | `narrative` | 展开时用哪个字段:`narrative`(叙述长文)或 `facts`(要点列表) | 只在 `FULL_COUNT` 大于 0 时有用。**实测 `facts` 反而比 `narrative` 更长**(`FULL_COUNT=3` 时 6095 对 5645 字符,样本仅 3 条展开),原先"想省 token 用 `facts`"的说法不成立 |
-| `CONTEXT_OBSERVATION_TYPES` | 空 | 类型白名单,如 `bugfix,decision,discovery`。空 = 当前模式里的所有类型 | 只能缩小不能超出模式的类型表;模式里没有的名字被忽略 |
-| `CONTEXT_MAIN_AGENT_ONLY` | `true` | 注入时不带子代理的笔记,避免流水账挤掉主会话的长期记忆 | 保持。搜索和 viewer 仍能看到全部 |
+| 键                           | 默认          | 说明                                                 | 调法                                                                                                                                 |
+| --------------------------- | ----------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `CONTEXT_OBSERVATIONS`      | `50`        | 最多注入多少条观察。校验范围 0 到 200,取最近的 N 条                    | 嫌上下文太满就降到 20 到 30;想要更多历史就升                                                                                                         |
+| `CONTEXT_SESSION_COUNT`     | `10`        | 显示最近多少次"会话总结"                                      | 一般不动。上下文超预算时会被减半                                                                                                                   |
+| `CONTEXT_FULL_COUNT`        | `0`         | 最近前 N 条除了标题还展开详细内容。0 = 全只显示标题                      | 想让最近几条更详细可设 3 到 5。上下文瘦身时它最先被砍                                                                                                      |
+| `CONTEXT_FULL_FIELD`        | `narrative` | 展开时用哪个字段:`narrative`(叙述长文)或 `facts`(要点列表)          | 只在 `FULL_COUNT` 大于 0 时有用。**实测 `facts` 反而比 `narrative` 更长**(`FULL_COUNT=3` 时 6095 对 5645 字符,样本仅 3 条展开),原先"想省 token 用 `facts`"的说法不成立 |
+| `CONTEXT_OBSERVATION_TYPES` | 空           | 类型白名单,如 `bugfix,decision,discovery`。空 = 当前模式里的所有类型 | 只能缩小不能超出模式的类型表;模式里没有的名字被忽略                                                                                                         |
+| `CONTEXT_MAIN_AGENT_ONLY`   | `true`      | 注入时不带子代理的笔记,避免流水账挤掉主会话的长期记忆                        | 保持。搜索和 viewer 仍能看到全部                                                                                                               |
 
 ### 调教顺序建议
 
@@ -496,6 +496,48 @@ B 就是之前推论的情形:近 90 天里只要有一条不相干的向量结�
 
 **后续订正(2026-11-08)**:上面"没有改配置能解决"只对 `CLAUDE_MEM_EMBEDDING_MODEL` 成立(本机路径改任何值都不报错也不生效)。后来发现可以借 `CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION=openai` 加 `~/.chroma_env` 指向本机 Ollama 的 bge-m3,已上线。30 条手工标准答案验收:中问中从基本不可用变成勉强可用(第 1 名 4 到 8 条/20,前 3 名 5 到 12 条/20),英问中没变好;**及格不是达标**。另外 `CHROMA_EMBEDDING_FUNCTION` 填白名单外的值,运行中不报错,重启 worker 后才报错;`DELETE /api/observation/:id` 会同步清 SQLite 与向量。原理、步骤、验收见 [[claude-mem-本地多语言向量方案]]。
 
+### 中文召回的最终做法(2026-11-09 补)
+
+**一句话:没有改源码。用 Ollama 在本机跑多语言模型 `bge-m3`,把它伪装成 OpenAI 的嵌入接口,让 claude-mem 借用的 chroma-mcp 去连它。数据不出本机。**
+
+**用了哪几样东西**
+
+| 东西 | 在哪 | 作用 |
+|---|---|---|
+| Ollama + `bge-m3` | 本机 `127.0.0.1:11434` | 真正算向量的多语言模型,1024 维 |
+| 模型别名 `text-embedding-ada-002` | Ollama 里,`ollama cp bge-m3 text-embedding-ada-002` | chroma-mcp 的 OpenAI 嵌入函数无参构造时只认这个模型名,别名让它指向 bge-m3。**不能删、不能覆盖** |
+| `~/.chroma_env` | 软链,真文件在 `~/.config/opencode/claude-mem/chroma_env` | 写 `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` 和占位的 `OPENAI_API_KEY`。chroma-mcp 启动时会读它 |
+| `CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION` | `settings.json`,值 `"openai"` | 让 claude-mem 用 openai 这个嵌入函数名。这个名字实际连的是上面的本机 Ollama,不是云端 |
+
+**软链关系**
+- `~/.chroma_env` 是软链,指向配置仓库里的 `claude-mem/chroma_env`,所以这份配置跟着配置仓库走。
+- 同理,`~/.claude-mem/settings.json` 软链回 `~/.config/opencode/claude-mem/settings.json`。
+- 里面的 key 只是占位,不是真 key;网关的真 key 只在 `.env`。
+
+**做法(顺序)**
+1. 拉模型并建别名:`ollama pull bge-m3`,再 `ollama cp bge-m3 text-embedding-ada-002`。
+2. 写 `chroma_env` 并软链到 `~/.chroma_env`。
+3. 备份后,在 `settings.json` 加 `CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION="openai"`。
+4. 旧的 384 维向量库改名保留(`chroma.old-384`),重启 worker,整库自动重建为 1024 维(约 70 秒)。
+5. **回退**:函数改回 `default`,换回 `chroma.old-384` 与 `chroma-sync-state.json`,重启 worker。
+
+**效果(以最新验收为准)**
+
+| 口径 | 结果 |
+|---|---|
+| 30 条手工标准答案,中问中,第 1 / 前 3 / 前 6 名 | 8 / 16 / 18(共 20 条) |
+| 同上,英问中 | 3 / 7 / 9(共 10 条) |
+| 9884 道 LLM 出题,线上现状 | 第 1 名 61.6%,前 6 名 90.9%,按我预设的线是"及格" |
+
+- 上一段"4 到 8 条、前 3 名 5 到 12 条"是我早期用错口径(按表格出现顺序当名次)得出的,**已被上表取代**。
+- 结论:中文从基本不可用变成可用,但**及格,没到好**。主因更像是库里同主题条目太相似和 claude-mem 的向量化方式,不是模型。
+- 完整过程与数据:[[claude-mem-本地多语言向量方案]] 的 5.3(验收)、5.4(根因)、5.5(换模型)、5.6(大批量压测)。
+
+**要知道的限制**
+- `.chroma_env` 是 chroma-mcp 自带的行为,不是 claude-mem 官方支持的配置,升级后可能失效。
+- Ollama 变成常驻依赖;没开时新记忆写不进向量库,恢复后会回填(推断,没专门测)。
+- chroma-mcp 无法给查询加前缀,所以不能换需要前缀的模型(如 Qwen3)。
+
 ---
 
 ## 第 6 轮:跨端,OpenCode 与 DSH 共用记忆
@@ -506,11 +548,11 @@ B 就是之前推论的情形:近 90 天里只要有一条不相干的向量结�
 
 ### 键
 
-| 键 | 默认 | 要改成 | 说明 |
-|---|---|---|---|
+| 键                                   | 默认      | 要改成      | 说明                                                                                                                 |
+| ----------------------------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
 | `SESSION_START_INCLUDE_ALL_SOURCES` | `false` | `"true"` | 默认只注入"本工具自己"写的记忆(按 `platform_source` 过滤),所以 OpenCode 看不到 DSH 写的、反之亦然。设 `true` 就不按来源过滤。OpenCode 插件每次请求实时读它,**无需重启** |
-| `PROJECT_NAME_SOURCE` | `path` | 视情况 | 决定"这条记忆算哪个项目"。`path` = 用 git 仓库根目录的文件夹名;`git-remote` = 用 origin 地址推出的 `org/repo`,改目录名也不变。**两端同目录同设置才会落到同一项目** |
-| `TRANSCRIPTS_ENABLED` | `true` | 保持 | DSH 的记忆是靠 worker 读 DSH 会话记录采集的。设 `false` 则 DSH 自动采集失效 |
+| `PROJECT_NAME_SOURCE`               | `path`  | 视情况      | 决定"这条记忆算哪个项目"。`path` = 用 git 仓库根目录的文件夹名;`git-remote` = 用 origin 地址推出的 `org/repo`,改目录名也不变。**两端同目录同设置才会落到同一项目**      |
+| `TRANSCRIPTS_ENABLED`               | `true`  | 保持       | DSH 的记忆是靠 worker 读 DSH 会话记录采集的。设 `false` 则 DSH 自动采集失效                                                              |
 
 ### 要知道的 3 个限制
 

@@ -24,7 +24,7 @@ related:
 
 > 一句话:**claude-mem 的全部设置都在 `~/.claude-mem/settings.json` 一个文件里,新手只需要改 5 到 6 个键(观察者提供方、地址、密钥、模型、模式、脱敏开关),其余保持默认;隐私相关的几个键要装完核对一遍。**
 >
-> 基于 claude-mem main 分支(约 v15.12.0)源码,**未实测**。
+> 基于 claude-mem main 分支(约 v15.12.0)源码,主体是读源码的结论;本机已实测的部分(观察者、向量、跨端)见 [[claude-mem-调教清单]]、[[claude-mem-本地多语言向量方案]]、[[claude-mem-跨端共享]]。
 >
 > **想一点点调教?** 看 [[claude-mem-调教清单]]:它从 238 个键里挑出约 40 个,按"先后顺序"分 8 轮,每轮有验证方法和回退值。
 
@@ -100,7 +100,7 @@ npx claude-mem worker restart
 
 说明:
 
-- codebuddy 的真实地址和可用模型名,当前**未知**,所以示例只放占位符。
+- 本机实际没有直连 codebuddy,而是走公司网关,模型 `deepseek-v4.1-flash`,已跑通(见 [[claude-mem-调教清单]] 第 1 轮)。这里的示例保留占位符,方便别的环境照抄。
 - 研究文件的推荐示例里,布尔值写成了字符串 `"true"`/`"false"`;源码是否同样接受 JSON 布尔值,没读到,照抄字符串写法最稳。
 - 另有三个键值得顺手关掉,默认值都已读源码:`CLAUDE_MEM_REDACT_GENERIC_ENABLED`(默认 `false`,打开后连没有固定前缀的密码、`*_TOKEN=`、`Authorization: Bearer` 也脱敏)、`CLAUDE_MEM_MEDIA_CAPTURE_ENABLED`(**默认 `true`,会把图片存在本机**,不想存就设 `false`)、`CLAUDE_MEM_TELEGRAM_ENABLED`(**默认 `true`**,但没填 bot token 和 chat id 就不会发送)。这几个不是必须的。
 - "关统计"不靠 `settings.json`,用命令:
@@ -109,7 +109,7 @@ npx claude-mem worker restart
 npx claude-mem telemetry disable
 ```
 
-- 观察者接 codebuddy,源码层面理论可行,**没实测**。
+- 观察者:已实测经公司网关调用通过,直连 codebuddy 未试(推断行不通)。
 - 改完记得重启 worker,再按文末"配置自检清单"核对。
 
 ---
@@ -577,7 +577,7 @@ npx claude-mem restart
 
 | 键 | 默认值 | 说明 |
 |---|---|---|
-| `CLAUDE_MEM_SESSION_START_INCLUDE_ALL_SOURCES` | `false` | 默认只注入"本工具自己"写的记忆(按 `platform_source` 过滤),所以 OpenCode 看不到 DSH 写的、反之亦然。设为 `"true"` 就不按来源过滤,两端记忆混在一起注入。OpenCode 插件每次请求实时读它,无需重启。是否真能跨端召回,**没实测** |
+| `CLAUDE_MEM_SESSION_START_INCLUDE_ALL_SOURCES` | `false` | 默认只注入"本工具自己"写的记忆(按 `platform_source` 过滤),所以 OpenCode 看不到 DSH 写的、反之亦然。设为 `"true"` 就不按来源过滤,两端记忆混在一起注入。OpenCode 插件每次请求实时读它,无需重启。**已实测**:开启后 OpenCode 与 DSH 能互相读到对方写的记忆(见 [[claude-mem-跨端共享]] 第 8 节) |
 | `CLAUDE_MEM_PROJECT_NAME_SOURCE` | `path` | 决定"记忆算哪个项目"。两端把同一个工作目录交给 worker 算项目名,同目录同设置就落到同一项目 |
 | `CLAUDE_MEM_CONTEXT_PROJECTS` | `current` | **对 OpenCode 无效**:OpenCode 插件自己拼请求,没读这个键;只在走 hook 的客户端(如 Claude Code)生效 |
 
@@ -631,12 +631,12 @@ npx claude-mem restart
 1. 第三层各表只挑了新手相关的键;其余键的含义以附录里的默认值和源码注释为准,没有逐个解释。
 2. 改 `settings.json` 后必须重启 worker:来自"已读源码推断",没有逐键验证。
 3. 附录里布尔值全是字符串,是源码默认值的写法;用户手写 JSON 布尔值是否也被接受,没读到,照字符串写最稳。
-4. 选 `openai-compatible` 而不是 `openrouter` 来接 codebuddy,依据是读源码:它不带归因请求头、key 独立、安装器不会引导登录 cmem.ai。codebuddy 实际能否被它调通,没实测。
-5. 观察者接 codebuddy 是否可用:源码层面理论可行,没实测;codebuddy 的真实地址和模型名未知。
+4. 选 `openai-compatible` 而不是 `openrouter` 来接 codebuddy,依据是读源码:它不带归因请求头、key 独立、安装器不会引导登录 cmem.ai。**已实测**:`openai-compatible` 经公司网关调通(直连 codebuddy 没试)。
+5. 观察者接 codebuddy:本机已实测通过,走公司网关;额度限制和笔记质量没系统评估。
 6. `host` 提供方:源码确认它依赖本机已在运行的兼容服务,安装器不起;OpenCode、DSH 上有没有现成服务没读到,大概率没有,详见 [[claude-mem-安装部署]] 2.4 节。
 7. 模式文件 JSON 的完整字段列表没逐个读到;安装后 `plugin/modes/` 在本机的实际路径,以及升级是否会覆盖自定义模式文件,没读到。
 8. `EMBEDDING_MODEL` 只作用于服务器模式,是我读源码的判断;默认 worker 模式是否有别的路径用到它,没做全仓库追踪。
-9. 中文向量召回在默认配置下偏弱:有源码注释佐证,具体差距没实测。
+9. 中文向量召回在默认配置下偏弱:**已实测**。中问中 20 条,第 1 名命中从 4 条(默认 MiniLM)升到 8 条(bge-m3),水准是及格、不是达标;英问中样本小,没有明显改善(见 [[claude-mem-本地多语言向量方案]] 5.3)。
 10. 匿名统计(PostHog)具体发什么内容没读;关闭靠 `npx claude-mem telemetry disable`。
 
 ---

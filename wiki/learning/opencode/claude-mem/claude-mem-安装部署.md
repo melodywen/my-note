@@ -23,7 +23,7 @@ related:
 
 > 一句话:**安装 claude-mem 就是在本机起一个常驻后台的小服务(worker),再给 OpenCode 和 DSH 各装一个适配插件;最大的两个坑是"选错观察者提供方会被引到云端登录"和"本机只有 opencode.jsonc,安装器却只认 opencode.json"。**
 >
-> 基于 claude-mem main 分支(约 v15.12.0)源码;OpenCode 端已于 2026-11-08 装机并实测,实测记录见 3.7 节,DSH 端尚未安装。凡标"未证实/未验证/推断/没读到"的地方,都不是确定结论。
+> 基于 claude-mem main 分支(约 v15.12.0)源码;OpenCode 端已于 2026-11-08 装机并实测,实测记录见 3.7 节,DSH 端已于 2026-11-09 手动接入并实测(官方安装器对 `desktop` profile 必败,见 [[claude-mem-跨端共享]] 第 8 节)。凡标"未证实/未验证/推断/没读到"的地方,都不是确定结论。
 
 ---
 
@@ -65,7 +65,7 @@ related:
 | `~/.config/opencode/` | 只有 `opencode.jsonc`,**没有** `opencode.json`;另有 `opencode-mem.jsonc`、`oh-my-opencode-slim.json`、`plugins/` 目录 |
 | 现用记忆插件 | opencode-mem |
 | `~/.dsh/` | 存在,`profiles` 目录在 |
-| `~/.claude-mem` | 不存在,还没装过 |
+| `~/.claude-mem` | 装机前不存在(这是装机前的快照,现已装好) |
 | DSH profile 名 | `desktop` |
 
 ---
@@ -120,7 +120,7 @@ claude-mem 和 opencode-mem 并存会**重复注入**上下文。测试期间先
 - 选 `gemini` / `openrouter`,交互安装会走 `completeCmemTrialPairing`(浏览器配对 cmem.ai)。登录本身不会自动把记忆传云上,但会引出"托管观察者模型"这条路,里面发的是原始工具调用,风险最大(见第四节)。
 - 非交互安装(脚本里跑)需要先准备好对应 API key(如 `OPENROUTER_API_KEY`),或用 `--provider claude`(没写 `--provider` 的非交互安装默认就是 claude)。这是源码推断(`validateNonInteractiveProvider`)。
 - `host` 的真实含义:观察者不调云端,而是请求本机回环端口(127.0.0.1:37777 或 37778)上一个**你自己已经在跑的**兼容服务,由宿主 agent 充当记账员。安装器**不会替你起这个服务**,探测不到就直接报错退出(`cmem-memory-credentials.ts` 的 `resolveHostObserverPort`)。它是为 Grok Bot 和 Cursor 设计的(观察者模型名只有 `cursor`、`grok-bot` 两个,出处同文件的 `buildHostObserverSettings`),官方文档也只在 Grok Bot 章节讲它。**我没读到任何组件会在 OpenCode 或 DSH 上起这个服务,所以对你的两个端大概率不可用,不要当首选。**
-- 观察者接 codebuddy 没实测。源码里 `openai-compatible` 与 `openrouter` 都允许自定义 `BASE_URL`,前者更干净(见 3.6 节),理论可行。
+- 观察者接 codebuddy:**已实测通过**,但走的是公司网关,不是直连(见 3.6、3.7 和 [[claude-mem-调教清单]] 第 1 轮)。装机前读源码的判断是:`openai-compatible` 与 `openrouter` 都允许自定义 `BASE_URL`,前者更干净(见 3.6 节),理论可行。
 
 > 建议:**第一次用 `--provider claude` 装**,不触发 cmem.ai 登录;装完直接按 3.6 节把五个键改成 `openai-compatible` + codebuddy。没有 Claude 登录时,装完到改好配置之前观察者会不可用,这段时间不会产生记忆,属预期。`--provider claude` 在没登录 Claude 的机器上是否能顺利装完,**未验证**。
 
@@ -305,7 +305,7 @@ OPENAI_COMPAT_API_KEY=<你的网关 key>
 | `~/.config/opencode/opencode.json` | 读取并写入:在 `plugin`(OpenCode v1)或 `plugins` 数组加插件路径;解析到 `mcp-server.cjs` 时注册本地 MCP。**本机原本没有此文件,可能新建** |
 | 全局 `AGENTS.md` | 清理旧版本的 claude-mem 记忆块 |
 
-**DSH 侧**
+**DSH 侧**(以下是官方安装器会做的事;本机 `desktop` profile 装不了,是手动做的,见 [[claude-mem-跨端共享]] 第 8 节)
 
 | 路径 | 动作 |
 |---|---|
@@ -490,11 +490,11 @@ npx claude-mem restore <file>   # 恢复
 1. **`CLAUDE_MEM_ONLINE_OPTIN=false` 是否有效**:源码中没找到处理该变量的逻辑,**未证实有效**,与旧笔记结论冲突。
 2. **非交互安装的细节**:`--provider openrouter` 非交互时是否还要额外参数,**未验证**;"需要 API key 或 `--provider claude`"是源码推断。
 3. **不登录时安装器会不会因联网失败而中断**:**未验证**,更新日志的说法可能只针对 cmem 提供方。
-4. **DSH 侧**:没看到直接操作 `cordis.patch.yml`,而是委托 `dsh plugin ... add`;DSH 最终改了哪些文件,没读到。旧笔记的说法不采用。DSH 端**尚未安装**。
+4. **DSH 侧**:没看到直接操作 `cordis.patch.yml`,而是委托 `dsh plugin ... add`;DSH 最终改了哪些文件,没读到。旧笔记的说法不采用。**2026-11-09 实测:对 `desktop` profile,`dsh plugin` 被 `dsh` 命令行写死拒绝(`bin.js:36`),安装器必败;本机改为手动加插件依赖和监听文件,见 [[claude-mem-跨端共享]] 第 8 节。**
 5. **`host` 提供方**:已读源码确认它依赖本机已在运行的兼容服务,装不上就报错;但 OpenCode、DSH 上有没有现成组件充当这个服务,没读到,只能说大概率没有。
 6. **直连 codebuddy 是否 401/403**:只是据插件源码的推断,**未实测**。
 7. **观察者发给网关的请求包是否已脱敏**:没抓包,**未证实**。
-8. **两端项目名是否一致**:OpenCode 端是 `my-note`;DSH 端项目名未验证。DSH 写入的来源名按源码推为 `dsh`,**未验证**。
+8. **两端项目名是否一致**:OpenCode 端是 `my-note`;**已实测**:DSH 在 `my-note` 目录开,项目名也是 `my-note`;DSH 写入的来源名是 `dsh`(见 [[claude-mem-跨端共享]] 第 8 节)。
 9. **网页保存设置后软链是否保持**:据 `atomic-json` 只读推断,**未验证**。
 10. **tree-sitter 下载得到空内容的原因**:疑为公司网络或镜像拦截,**未证实**;"自替换交接超时"告警的原因没查。
 11. **日志文件位置**:没记录。worker 端口键已确认是 `CLAUDE_MEM_WORKER_PORT`,默认 `37700 + (uid % 100)`。

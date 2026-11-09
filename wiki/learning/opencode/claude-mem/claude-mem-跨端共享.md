@@ -161,7 +161,7 @@ claude-mem 有官方的 DSH 集成,不是社区拼凑。
 ## 6. 想让两端共用,按这个顺序做
 
 1. 先装 OpenCode 端,确认一条记忆能写进去、能搜到。
-2. 再装 DSH 端:`npx claude-mem install --ide dsh --dsh-profile desktop --runtime worker`。
+2. 再装 DSH 端:`npx claude-mem install --ide dsh --dsh-profile desktop --runtime worker`。**本机实测这条对 `desktop` 必败**,要手动做,见第 8 节。
 3. 两端在同一个 git 仓库里各开一次会话,各问一个有区别的问题。
 4. 把 `CLAUDE_MEM_SESSION_START_INCLUDE_ALL_SOURCES` 改成 `true`,重启 DSH,看它的上下文里能不能出现 OpenCode 写的记忆。
 5. 看不到就按三道关卡倒着查:先看 worker 是不是同一个,再看开关,最后看项目名。

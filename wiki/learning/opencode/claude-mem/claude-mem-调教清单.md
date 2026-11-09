@@ -593,9 +593,9 @@ B 就是之前推论的情形:近 90 天里只要有一条不相干的向量结�
 - **手动做法两件事:** ① 在 DSH 配置仓库的 `desktop/package.json` 加 `@claude-mem/dsh` 依赖和 bundle;② 新建 `~/.claude-mem/transcript-watch.json`(监听名 `dsh`,目录 `~/.dsh/sessions`,`startAtEnd: true`),重启 worker。本机把监听文件放进配置仓库并软链。
 - **DSH 来源名是 `dsh`**(已实测)。
 - **项目名一致,但看在哪个目录开 DSH:** 在 `my-note` 开则项目是 `my-note`,在 `~/.config/opencode` 开则项目是 `opencode`。
-- **OpenCode 能搜到 DSH 写的观察**(搜"武汉天气"排第 1、2 名);**DSH 启动时能读到 OpenCode 写的观察概览**。
+- **OpenCode 能搜到 DSH 写的观察**(搜"武汉天气"排第 1、2 名);**DSH 启动时能读到 OpenCode 写的观察概览**(启动注入与主动搜索两路都通)。
 - 只有问答、没有工具调用的 DSH 会话,不产生观察,只产生摘要。
-- 没测:DSH 的 `mem_search` 工具能否搜到 OpenCode 记忆。
+- **DSH 的 `mem_search` 工具能搜到 OpenCode 写的记忆**(在 DSH 问"搜一下 claude-mem 向量方案",返回 30 条,含 OpenCode 写的观察 `#315` 等)。
 - 完整过程见 [[claude-mem-跨端共享]] 第 8 节。
 
 ---

@@ -407,6 +407,13 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 
 **不建议这一轮开。** 它走的是普通搜索入口,据此推断同样受 90 天窗口约束、依赖向量检索质量。而你的笔记是中文,默认向量模型对中文弱(见第 5 轮)。先把第 5 轮的召回质量搞清楚,再决定要不要开。
 
+**在 OpenCode 上很可能不生效(2026-11-09 补,读源码核对,未实测)**
+- 读这个开关并请求语义注入的代码,只在 Claude Code 的提问钩子 `src/cli/handlers/session-init.ts`(231 到 258 行)。
+- OpenCode 插件源码 `src/integrations/opencode-plugin/` 里搜不到 `semantic`,没有读这个开关,也没有请求语义注入接口。已装的 `~/.config/opencode/plugins/claude-mem.js` 里只有一份打包进去的默认设置表(值为 `"false"`),不是调用。
+- 所以你用 OpenCode 时,设 `SEMANTIC_INJECT="true"` 多半**什么都不会发生**。这是读代码的推断,没有在 OpenCode 上实测开关前后的差别。
+- OpenCode 上"开场给我多少记忆"靠上面的 `CONTEXT_OBSERVATIONS`(按时间取最近 N 条标题),不是按问题相关度。
+- 另外,`claude_mem_search` 工具每次固定返回 **10 条**,数字写死在插件源码里(`opencode-plugin/core.ts:443` 的 `limit=10`),**没有配置项**。详见 [[claude-mem-本地多语言向量方案]] 5.7。
+
 ### 其他注入类键(默认值已合理)
 
 | 键 | 默认 | 备注 |

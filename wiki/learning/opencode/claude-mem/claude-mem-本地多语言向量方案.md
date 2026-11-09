@@ -336,7 +336,7 @@ launchd
 - 改搜索工具的 10 条只能改 `~/.config/opencode/plugins/claude-mem.js`,那是安装生成的文件,升级会被覆盖,不建议改。
 - 日常取 10 条,比 5.6 重点看的前 6 名更宽,**推断**找到率不低于前 6 名那个约 9 成。我没有单独测前 10 名命中率,只有 MRR@10 的数据。
 - 这 10 条是 AI 看的标题索引,AI 还要挑选并用 `claude_mem_get_observations` 取细节,排得靠后更容易被漏选。
-- `CLAUDE_MEM_SEMANTIC_INJECT` 在 OpenCode 上是否生效**未验证**。我在 OpenCode 插件源码里没搜到相关调用,推测它只对 Claude Code 的提问钩子有效,需要实测。
+- `CLAUDE_MEM_SEMANTIC_INJECT` 在 OpenCode 上是否生效**未实测**。读源码的结果:读这个开关并请求语义注入的只有 Claude Code 的提问钩子 `src/cli/handlers/session-init.ts`;OpenCode 插件源码里搜不到 `semantic`,所以多半不生效。这是读代码的推断,没有实测开关前后的差别。
 - 注入有两种格式:`narrative` 带完整叙述,`index` 只给 ID 加标题,要再取细节。
 - 今天(2026-11-09)的搜索次数 27、返回总条数 436,平均约 16 条;这个平均数包含了压测和验收时直接调接口的搜索,不代表日常用法。
 

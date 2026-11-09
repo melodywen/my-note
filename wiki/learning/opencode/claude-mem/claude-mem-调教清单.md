@@ -64,7 +64,7 @@ npx claude-mem restart
 | 第 3 轮 | 采集:什么该记、什么不该记 | 6 | 建议 | 已做,仅 SKIP_TOOLS 有效,其余 5 键在 OpenCode 下无效或暂不需要 |
 | 第 4 轮 | 注入:开会话时塞多少旧记忆 | 6 | 建议 | 已测,保持默认,一个键都没改 |
 | 第 5 轮 | 检索:中文召回与 90 天窗口 | 4 | 已完成 | 已做:`SEARCH_RECENCY_DAYS` 改为 `0`,其余 3 键保持默认;之后又上线本地 bge-m3 向量(及格非达标,见[[claude-mem-本地多语言向量方案]]) |
-| 第 6 轮 | 跨端:OpenCode 与 DSH 共用 | 3 | 必改(若要共用) | 未做 |
+| 第 6 轮 | 跨端:OpenCode 与 DSH 共用 | 3 | 已完成 | 已做:`SESSION_START_INCLUDE_ALL_SOURCES="true"`;`desktop` profile 官方安装器必败,改为手动加插件和监听文件(见[[claude-mem-跨端共享]] 第 8 节)。三个方向已实测通 |
 | 第 7 轮 | 运维:备份、日志、清理 | 6 | 可选 | 未做 |
 | 附 | 先别碰的键 | | 观察 | 未做 |
 
@@ -585,9 +585,18 @@ B 就是之前推论的情形:近 90 天里只要有一条不相干的向量结�
 3. 两条的 `project` 一样吗?`platform_source` 分别是什么?
 4. 开新会话,看注入里有没有对方的笔记。
 
-### 没实测
+### 实测结果(2026-11-09)
 
-跨端实际能否召回、DSH 来源名是什么,都没实测。详见 [[claude-mem-跨端共享]]。
+**一句话:读、写、搜索三个方向都通了,但 `desktop` profile 要手动装。**
+
+- **`desktop` profile 不能用官方安装器装。** `dsh` 命令行写死拒绝名字叫 `desktop` 的 profile(`@deepseek-ai/dsh/lib/bin.js:36`),与桌面应用是否运行无关。安装器还会顺带把 claude-mem 本体升级并停掉 worker,别反复跑。
+- **手动做法两件事:** ① 在 DSH 配置仓库的 `desktop/package.json` 加 `@claude-mem/dsh` 依赖和 bundle;② 新建 `~/.claude-mem/transcript-watch.json`(监听名 `dsh`,目录 `~/.dsh/sessions`,`startAtEnd: true`),重启 worker。本机把监听文件放进配置仓库并软链。
+- **DSH 来源名是 `dsh`**(已实测)。
+- **项目名一致,但看在哪个目录开 DSH:** 在 `my-note` 开则项目是 `my-note`,在 `~/.config/opencode` 开则项目是 `opencode`。
+- **OpenCode 能搜到 DSH 写的观察**(搜"武汉天气"排第 1、2 名);**DSH 启动时能读到 OpenCode 写的观察概览**。
+- 只有问答、没有工具调用的 DSH 会话,不产生观察,只产生摘要。
+- 没测:DSH 的 `mem_search` 工具能否搜到 OpenCode 记忆。
+- 完整过程见 [[claude-mem-跨端共享]] 第 8 节。
 
 ---
 

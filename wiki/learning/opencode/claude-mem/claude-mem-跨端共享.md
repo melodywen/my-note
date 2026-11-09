@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "claude-mem 跨端共享:OpenCode 和 DSH 怎么共用一份记忆"
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-09
 tags:
   - learning
   - opencode
@@ -23,7 +23,7 @@ related:
 
 > 一句话:**两个端各自接一个小插件,把事件发给同一个本机 worker 进程,存进同一个数据库。能不能互相看到,取决于三件事:项目名算得一不一致、来源过滤开没开、两端是不是都真的接上了。**
 >
-> 依据是读源码(claude-mem main,约 v15.12.0),**没有实测**。标"未证实"的是没读到或没验证的部分。
+> 前半部分依据读源码(claude-mem 约 v15.12.0);**2026-11-09 已在本机实测 DSH 这一端,结果见第 8 节**。标"未证实"的是没读到或没验证的部分。
 
 ---
 
@@ -95,14 +95,12 @@ claude-mem 有官方的 DSH 集成,不是社区拼凑。
 
 - 插件里 `ingest: false`、`summarize: false`,所以插件**只负责把记忆注入 DSH**,不负责写。
 - 写入靠 worker 监听 `~/.dsh/sessions` 下的会话日志(`.jsonl.zstd`),按 `dsh/transcript-schema.json` 解析出用户消息、助手消息、工具调用、工具结果。
-- 监听条目的名字是 `dsh`,而 worker 把"来源"取自监听名(`processor.ts:197`,经 `normalizePlatformSource`)。所以 DSH 写入的来源是 `dsh`。这一条是推出来的,没实测。
-
-这回答了之前的一个未解项:"DSH 写入记忆的来源名"是 `dsh`(推断,有源码链条)。
+- 监听条目的名字是 `dsh`,而 worker 把"来源"取自监听名(`processor.ts:197`,经 `normalizePlatformSource`)。所以 DSH 写入的来源是 `dsh`。**已实测确认**(第 8 节)。
 
 没读到的部分:
 
 - DSH 插件本体 `dsh/lib/index.js` 在源码树里不存在(是构建产物),所以 DSH 取记忆时带不带来源参数,**未证实**。
-- 本机 DSH 的 profile `desktop` 装上后实际表现,**未实测**。
+- 本机 `desktop` profile 不能用官方安装器装,原因和手动做法见第 8 节。
 
 ---
 
@@ -176,10 +174,54 @@ claude-mem 有官方的 DSH 集成,不是社区拼凑。
 
 | 项 | 状态 |
 |---|---|
-| DSH 写入的来源名是 `dsh` | 源码链条推出,没实测 |
+| DSH 写入的来源名是 `dsh` | **已实测**(第 8 节) |
 | DSH 插件取记忆时带不带来源参数 | 插件本体是构建产物,没读到 |
 | 搜索接口在 worker 侧是否默认按来源或项目过滤 | 只读了插件侧 |
-| 两端同目录算出的项目名是否一致 | 按源码应一致,没实测 |
+| 两端同目录算出的项目名是否一致 | **已实测一致**(都是 `my-note`) |
 | `git-remote` 模式对你的仓库是否合适 | 没实测 |
 | DSH 去重逻辑 | 只看到有测试文件,没读实现 |
-| `desktop` profile 装上后的实际表现 | 没实测 |
+| DSH 的 `mem_search` 工具能否搜到 OpenCode 写的记忆 | 没测。只确认了"启动时注入"这一路 |
+| DSH 会话末尾报 `Missing last_assistant_message`,导致那轮没有摘要 | 日志里见到,原因没查 |
+
+---
+
+## 8. 2026-11-09 本机实测(DSH 这一端)
+
+**一句话:读、写、搜索三个方向都在本机通了。但 `desktop` 这个 profile 不能用官方安装器装,要手动做两件事。**
+
+### 8.1 为什么官方安装器对 `desktop` 必败
+
+- `npx claude-mem install --ide dsh --dsh-profile desktop` 内部会执行 `dsh plugin --profile desktop add …`。
+- `dsh` 命令行把 `desktop` 这个名字写死拒绝:`@deepseek-ai/dsh/lib/bin.js` 第 36 行 `rejectElectronProfile`,报错 `profile "desktop" is managed exclusively by the Electron application`。**按名字判断,与桌面应用是否在运行无关。**
+- 所以安装器会把 DSH 判为失败;只选了 DSH 一项时整体 `all-ides-failed` 中止。
+- **副作用:这个失败的安装器仍然先把 claude-mem 本体升级了(15.12.0 到 15.12.1)并停掉了 worker**,要手动 `worker-service.cjs start` 拉起来。别对 `desktop` 反复跑它。
+- 能装的只有其他名字的 profile(`web`、`headless` 等)。DSH 官方有没有给桌面版装插件的正规入口,**没查**。
+
+### 8.2 手动做法(等价于安装器干的两件事)
+
+| 步骤 | 做什么 | 备注 |
+|---|---|---|
+| 读:让 DSH 加载插件 | 在 DSH 配置仓库的 `desktop/package.json` 加依赖 `"@claude-mem/dsh": "link:../plugins/claude-mem-dsh"`,并把 `@claude-mem/dsh` 加进 `dsh.profile.bundles`,再 `pnpm install`、重启 DeepSeek Harness | 插件包从 `~/.claude/plugins/marketplaces/thedotmack/dsh/` 复制到配置仓库的 `plugins/claude-mem-dsh/`。**这份是复制品,claude-mem 升级后不会自动更新** |
+| 写:让 worker 采集 DSH 会话 | 新建 `~/.claude-mem/transcript-watch.json`:监听名 `dsh`、路径 `~/.dsh/sessions`、`startAtEnd: true`、内嵌 `transcript-schema.json`;重启 worker | 本机的真文件放配置仓库 `~/.config/opencode/claude-mem/transcript-watch.json`,软链到 `~/.claude-mem/`。文件里没有密钥 |
+| 放开来源过滤 | `settings.json` 设 `CLAUDE_MEM_SESSION_START_INCLUDE_ALL_SOURCES="true"` | OpenCode 插件每次实时读,不用重启 |
+
+- `~/.claude/plugins/...` 这个目录是 claude-mem 本体的统一安装位置(源码 `shared/paths.ts:53`),不管装哪个客户端都会建。OpenCode 的 `claude-mem.js` 是单独打包放在 `~/.config/opencode/plugins/` 的,升级本体后要重跑 `npx claude-mem install --ide opencode` 才会更新。
+- 想让 DSH 插件随 claude-mem 自动更新,可以把 `link:` 改成指向 `~/.claude/plugins/marketplaces/thedotmack/dsh` 的绝对路径。代价:换机器会失效,且升级后要重启 DSH。**没采用,仍是复制品。**
+
+### 8.3 实测结果
+
+| 项 | 结果 |
+|---|---|
+| DSH 会话被采集 | 通。库里出现 `platform_source=dsh` 的会话 |
+| 来源名 | `dsh`,与源码推断一致 |
+| DSH 提示词入库 | 通。"你好啊""你是有加载长期记忆的吗"都能搜到 |
+| DSH 工具调用产生观察 | 通。让 DSH 查武汉天气(搜索网页、访问网页)后,出现观察 466、467,来源 `dsh` |
+| 项目名与 OpenCode 一致 | 通,**但取决于在哪个目录开 DSH**:在 `~/ai-work/my-note` 开,项目是 `my-note`;在 `~/.config/opencode` 开,项目是 `opencode` |
+| OpenCode 端能搜到 DSH 写的内容 | 通。搜"武汉天气",观察 466、467 排第 1、2 名 |
+| DSH 能读到 OpenCode 写的记忆 | 通,**只确认"启动时注入"这一路**。DSH 自己回答"会话启动时注入了近期上下文摘要,即 50 条观察的概览";库里当时的观察全部来自 OpenCode,所以它读到的是 OpenCode 写的 |
+| 只有问答、没有工具调用的会话 | 只产生摘要,**不产生观察** |
+
+### 8.4 两个顺带发现
+
+- DSH 当时联网搜索失败,观察 466 记的是"web_search 因 CodeBuddy API 返回 401 失败"。这是 DSH 自己的问题,与 claude-mem 无关。
+- 日志出现 `ERROR Missing last_assistant_message in session for summary prompt`,在 DSH 会话第 4 轮结束时,该轮没生成摘要。不影响观察写入,原因没查。

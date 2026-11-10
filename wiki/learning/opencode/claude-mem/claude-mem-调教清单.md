@@ -18,6 +18,7 @@ related:
   - "[[claude-mem-存储与读取机制]]"
   - "[[claude-mem-跨端共享]]"
   - "[[claude-mem-深入调研]]"
+  - "[[claude-mem-mode文件与覆盖机制]]"
 ---
 
 # claude-mem 调教清单
@@ -343,6 +344,8 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 
 上面 6 个键都是"按工具/项目"在入队前拦。还有另一层:**观察者(observer)模型自己按 mode 文件里的规则判断"这条记不记"**。第 3 轮原先漏了这一层。
 
+> mode 文件怎么加载、`MODE` 的配方怎么拆、JSON 里能写哪些键、怎么新建覆盖文件,单独写了一篇:[[claude-mem-mode文件与覆盖机制]]。本节只讲和"跳过规则"直接相关的部分。
+
 **规则在哪:** `plugin/modes/code.json` 的两段提示词。
 - `recording_focus`:该记什么(新能力、发布的修复、具体的调试发现等)。
 - `skip_guidance`:该跳过什么。默认 `code` 里的要点:本会话已记过的事实/决策/修复,换说法也不再记;重复确认同一结果的迭代(评审轮次、重试)只记第一次;只描述"分析过程"的不记。跳过时 observer 回 `<skip_summary reason="noise" />`。
@@ -371,38 +374,38 @@ OpenCode 插件不发 `agentId`/`agentType`,`SKIP_SUBAGENT_OBSERVATIONS` 也压�
 **和 `SKIP_TOOLS` 的区别:** `SKIP_TOOLS` 在入队前按工具名拦,是硬规则,但只能按工具名,拦不了"整理流程里的 shell 调用"而不误伤别的 shell。`skip_guidance` 是 observer 看到内容后自己判断,能按"这件事是不是整理回执"来跳过,但不保证。两者是两道关,可以同时用。
 
 **可选的调法(没实测):** 不改插件文件(更新会被覆盖),用官方支持的覆盖 mode:
-1. 新建 `~/.claude-mem/modes/code--zh--<名字>.json`(用户 mode 目录,见 [[claude-mem-配置详解]] 的 modes 说明),只写 `prompts.skip_guidance`,在默认文本基础上加一条"记忆整理等流程的操作回执(写入、归档、删除、复核确认)一律跳过,只记最终结论和踩坑"。
+1. 新建覆盖文件(用户 mode 目录,见 [[claude-mem-配置详解]] 的 modes 说明;**文件名是 `code--<名字>.json`,不带 `zh`**,原因见 [[claude-mem-mode文件与覆盖机制]] 2.1),只写 `prompts.skip_guidance`,在默认文本基础上加一条"记忆整理等流程的操作回执(写入、归档、删除、复核确认)一律跳过,只记最终结论和踩坑"。
 2. 把 `CLAUDE_MEM_MODE` 改成新 ID,重启 worker。
 3. 回退:`MODE` 改回 `code--zh`,删掉覆盖文件。
 
 **注意:** `MODE` 是全局的,影响所有项目;重启 worker 会中断正在被记录的会话;`skip_guidance` 是给 LLM 的文字规则,能压住多少没测。
 
-#### 覆盖文件的草稿(只在文档里,磁盘上还没建)
+#### 覆盖文件(已建在磁盘上,尚未启用)
 
 **文件名和 `MODE` 的值不是同一个字符串,这里最容易搞错:**
 - `CLAUDE_MEM_MODE` 填 `code--zh--lean`;
 - worker 按 `--` 把它拆成父 `code`,加上两个覆盖 `code--zh`、`code--lean`,**按这个顺序**逐个 `deepMerge`;
-- `code--zh` 是内置的(插件自带);`code--lean` 不是内置的,所以去用户目录找,文件就叫 **`~/.claude-mem/modes/code--lean.json`**(不是 `code--zh--lean.json`)。
-- 这样中文翻译键来自 `code--zh`,`skip_guidance` 来自最后合并的 `code--lean`,互不冲突。
-- 用户目录里的同名文件如果和内置 mode 重名(比如叫 `code--zh.json`),会被忽略并报错 `bundled mode cannot be shadowed`,所以名字不能取成内置的。
+- `code--zh` 是内置的(插件自带);`code--lean` 不是内置的,所以去用户目录找,文件就叫 **`~/.claude-mem/modes/code--lean.json`**(不是 `code--zh--lean.json`);
+- 这样中文翻译键来自 `code--zh`,`skip_guidance` 来自最后合并的 `code--lean`,互不冲突;
+- 用户目录里的同名文件如果和内置 mode 重名,会被忽略并报错 `bundled mode cannot be shadowed`,所以名字不能取成内置的。
 
-该目录现在**不存在**,要建的话先 `mkdir -p ~/.claude-mem/modes`。
+`~/.claude-mem/modes` 是软链,指向 `~/.config/opencode/claude-mem/modes/`(和 `settings.json` 一样随配置仓库走)。
 
-写法依据:覆盖文件**只需要写要覆盖的那一个键**,其余键不用重复(合并后才校验完整性)。`skip_guidance` 是字符串,覆盖会**整段替换**默认文本,所以下面把默认的 5 条原样抄了一遍,只在后面追加 1 条。
+写法:覆盖文件**只需要写要覆盖的那一个键**(合并后才校验完整性)。`skip_guidance` 是字符串,覆盖会**整段替换**默认文本,所以前 5 条是对默认英文的逐条直译,只在后面追加第 6 条。规则本身改成了**中文**,方便人审;只有末尾的 `<skip_summary reason="noise" />` 标签必须原样保留,worker 用正则解析它。
 
 ```json
 {
   "name": "Code Development (Chinese, lean)",
   "prompts": {
-    "skip_guidance": "WHEN TO SKIP\n------------\nSkip routine operations:\n- A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently. This especially applies to iterative loops (PR review rounds, retry cycles, polling) that re-confirm the same outcome multiple times - record it ONCE on first confirmation, then skip all later re-confirmations of the identical fact.\n- Empty status checks\n- Package installations with no errors\n- Simple file listings with no follow-on finding\n- File related research that comes back empty or not found\n- Operation receipts of memory-maintenance work (writing a merged memory, archiving or deleting old memories, \"memory #N written\", \"archived to file X\", re-checking that a deletion happened). Record only the final conclusion and any gotcha learned, never the individual steps.\n\nIf skipping, reply with exactly <skip_summary reason=\"noise\" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose."
+    "skip_guidance": "何时跳过\n------------\n跳过例行操作:\n- 本会话中你已经记录过的事实、决策或修复状态,即使换了说法也不要再记。尤其是反复确认同一结果的循环(评审轮次、重试、轮询):只在第一次确认时记一次,之后对同一事实的再次确认一律跳过。\n- 空的状态检查\n- 没有报错的软件包安装\n- 没有后续发现的简单文件列表\n- 查无结果的文件相关调研\n- 只说明\"做了某一步\"或\"结果符合预期\"的操作回执,例如:写入了一条记忆、归档或删除了旧记忆、\"记忆 #N 已写入\"、\"已归档到文件 X\"、复查确认删除生效、提交或推送完成。只有出乎意料的结果,或能说明决策、根因、踩坑的内容才记。\n\n如果要跳过,请严格只回复 <skip_summary reason=\"noise\" />(reason 属性里写一句简短理由),不要回复其他任何内容。不要回复空内容,也不要用文字解释为什么跳过。"
   }
 }
 ```
 
-和默认文本的区别只有一处:在"File related research…"后面多了第 6 条,点名"记忆整理的操作回执一律跳过,只记最终结论和踩坑"。其余字符与 `code.json` 一致(从原文逐字复制,不是重写)。
+第 6 条是"判断标准"而不是"清单":只说明"做了某一步"或"结果符合预期"的回执一律跳过,**出乎意料的结果、决策、根因、踩坑仍然要记**。英文对照和逐条说明见 [[claude-mem-mode文件与覆盖机制]] 5.2。
 
 启用步骤(**都还没做**):
-1. `mkdir -p ~/.claude-mem/modes`,把上面的 JSON 写入 `~/.claude-mem/modes/code--lean.json`;
+1. 确认文件和软链在:`ls -la ~/.claude-mem/modes/code--lean.json`(`~/.claude-mem/modes` 已软链到 `~/.config/opencode/claude-mem/modes/`);
 2. 把 `CLAUDE_MEM_MODE` 改成 `code--zh--lean`(两份 settings.json 里 worker 读哪份没确认,见清单第 13 条);
 3. 重启 worker;
 4. 验证:取 `/api/context/inject` 看开头的 `Mode:` 行是否变化,再做一次整理,数新增过程记忆的条数,对比此前的 3 到 4 条。

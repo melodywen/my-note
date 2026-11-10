@@ -425,7 +425,8 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 | 重启时的警告 | 日志有 `Self-replacing worker handoff did not verify in time — falling back to CLI spawn`:旧 worker 没能自己交接,退回命令行拉起了新的(pid 74935);mode 已正常加载,没深究原因 |
 | 启用前基线 | my-note 最大观察 ID 1787,共 1256 条 |
 | 第一版规则测试 | 11:03–11:08 测两次,结果见 9.2 |
-| 第二版规则 | 11:13 重启后生效,此时 my-note 最大观察 ID 1824,**效果还没测**(见 9.3) |
+| 第二版规则 | 11:13 重启后生效,此时 my-note 最大观察 ID 1824,效果见 9.3 |
+| 硬规则 `SKIP_BASH_PATTERNS` | 已写进 `settings.json` 与 `settings.example.jsonc`,**对 OpenCode 无效**(见 9.4) |
 
 ---
 
@@ -459,7 +460,7 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 **结论:** 规则已加载,但 4 次该跳的回执 0 次被跳,没有可见效果。每次融合记忆写入后,observer 紧跟着再记一条转述(时间戳同一秒),这是最稳定的过程记忆来源。原因推断:回执正文夹着具体细节,observer 把它当成"含踩坑"走了例外口子。没法区分是"规则太弱"还是"例外口子被滥用"。
 
-### 9.3 第二版规则(11:13 起)的复测(待做)
+### 9.3 第二版规则(11:13 起)的复测
 
 第二版把记忆维护类调用单独拆成第 6 条,按**调用类型**一刀切,例外只留给调用失败。复测方法:
 
@@ -469,13 +470,34 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 4. 对比 9.2:同样 3 组整理,第一版产生 7 条,看第二版能降到几条;
 5. 同时检查有没有误伤:调试 `write_memory.py` 等脚本本身时,有价值的发现是否被跳过。
 
-结果写回本节。
+
+**第二版实测结果(11:17,1 组融合):** ID 1831 之后 7 条,其中 #1832 是准备测试时产生的不计;#1837 是真融合记忆;**#1838「将 #182 与 #256 融合为 #1837……」是转述,该被第 6 条跳过,没跳**。整理完成回执这次没出现(不知道是被跳过还是没生成)。累计两版:该跳的转述 0/4 被跳。样本小(这次只融合一组),但方向一致:`skip_guidance` 对这类按调用类型写的规则,flash 级 observer 基本不遵守。
+
+### 9.4 改用硬规则 `SKIP_BASH_PATTERNS`:对 OpenCode 无效
+
+想法:转述的源头是 observer 看到 `write_memory.py` 等脚本的 Bash 调用,用 `CLAUDE_MEM_SKIP_BASH_PATTERNS` 在入队前按命令文本拦,不靠模型听话。
+
+**探针实测(2026-11-10):** 规则 `memory-consolidate/scripts/(write_memory|archive_delete|restore_archive)\.py`,往 `/api/sessions/observations` 发三条完全相同的命令,只改 `tool_name`:
+
+| tool_name | 结果 |
+|---|---|
+| `Bash` | `skipped`,`bash_pattern_excluded` |
+| `bash` | `queued` |
+| `shell` | `queued` |
+
+**原因(读源码确认):** worker 里取命令文本的函数只认 `Bash`、`PowerShell`(取 `command`)和 `exec_command`(取 `cmd`),是严格相等判断;OpenCode 的命令工具叫小写 `bash`,拿不到命令文本,正则根本没被检查。插件 `~/.config/opencode/plugins/claude-mem.js` 上报前只把 `read/write/edit` 改成首字母大写,没有 `bash`。库里 `tool_uses` 139 条全是小写 `bash`,0 条 `Bash`。
+
+**这条旧结论其实早就在了**(调教清单第 3 轮已写"无效"),这次是重复验证。
+
+**没打补丁的原因:** 插件文件与官方 `dist/opencode-plugin/index.js` 逐字节相同,是安装时拷过来的压缩产物,没进配置仓库的 git,升级或重装会被覆盖且无提示。
+
+**现状:** 规则已配上,对 OpenCode 不生效,留着无害,上游若让 worker 或插件认小写 `bash` 就会自动生效。下一步是向上游提 issue。
 
 ## 10. 没验证的清单
 
 1. 多段 `MODE`(如 `code--zh--lean`)在真实 worker 里合并后的效果:只读了代码、跑了拆分函数,**没启动 worker 看合并结果**。
 2. 改 `MODE` 后是否必须重启 worker:`loadMode` 看起来在启动时调用,**没验证**是否热读。
-3. `skip_guidance` 能压住多少整理回执类的观察:第一版实测 0/4(见 9.2);**第二版没测**。
+3. `skip_guidance` 能压住多少整理回执类的观察:第一版 0/3、第二版 0/1,累计 0/4(见 9.2、9.3),样本小。
 4. 数组类键(`observation_types`)整体替换的行为:读 `deepMerge` 得出("数组不是普通对象,取覆盖方"),**没实测**。
 5. 叠加文件数量上限、提示词变长对成本的影响:源码里没找到上限,成本没测。
 6. 本机两份配置(`~/.claude-mem/settings.json` 与 `~/.config/opencode/claude-mem/settings.json`):已确认前者是软链指向后者,是同一个文件。

@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "claude-mem 调教清单"
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-10
 tags:
   - learning
   - opencode
@@ -61,7 +61,7 @@ npx claude-mem restart
 | 第 0 轮 | 先别动,记下"出厂状态" | 0 | 必做 | 已做 |
 | 第 1 轮 | 观察者:接上 codebuddy(经公司网关)、中文输出 | 6 | 必改 | 已做,实测通过 |
 | 第 2 轮 | 隐私:不泄密、不外发、不存图 | 7 | 必改 | 已做,脱敏已验证 |
-| 第 3 轮 | 采集:什么该记、什么不该记 | 6 | 建议 | 已做,仅 SKIP_TOOLS 有效,其余 5 键在 OpenCode 下无效或暂不需要 |
+| 第 3 轮 | 采集:什么该记、什么不该记 | 6 | 建议 | 已做,仅 SKIP_TOOLS 有效,其余 5 键在 OpenCode 下无效或暂不需要;另有 mode 层跳过规则,见本轮"observer 的跳过规则" |
 | 第 4 轮 | 注入:开会话时塞多少旧记忆 | 6 | 建议 | 已测,保持默认,一个键都没改 |
 | 第 5 轮 | 检索:中文召回与 90 天窗口 | 4 | 已完成 | 已做:`SEARCH_RECENCY_DAYS` 改为 `0`,其余 3 键保持默认;之后又上线本地 bge-m3 向量(及格非达标,见[[claude-mem-本地多语言向量方案]]) |
 | 第 6 轮 | 跨端:OpenCode 与 DSH 共用 | 3 | 已完成 | 已做:`SESSION_START_INCLUDE_ALL_SOURCES="true"`;`desktop` profile 官方安装器必败,改为手动加插件和监听文件(见[[claude-mem-跨端共享]] 第 8 节)。三个方向已实测通 |
@@ -338,6 +338,84 @@ CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUse
 - `bash` 里的 `cd`、`ls`、`cat` 噪音压不掉,要改源码才行(把 `shellCommandOf` 加上小写 `bash`)。这是源码补丁,升级会冲掉,没做。
 - 子代理(约 9% 的调用)压不掉,原因同上,要让 OpenCode 插件发 `agentId`/`agentType`,也得改源码。
 - 这一轮只是按工具名分类,没有评估"哪些工具产出的记忆质量高"。要做得精,需要跑几天后翻 viewer 看。
+
+### observer 的跳过规则(mode 层,2026-11-10 补)
+
+上面 6 个键都是"按工具/项目"在入队前拦。还有另一层:**观察者(observer)模型自己按 mode 文件里的规则判断"这条记不记"**。第 3 轮原先漏了这一层。
+
+**规则在哪:** `plugin/modes/code.json` 的两段提示词。
+- `recording_focus`:该记什么(新能力、发布的修复、具体的调试发现等)。
+- `skip_guidance`:该跳过什么。默认 `code` 里的要点:本会话已记过的事实/决策/修复,换说法也不再记;重复确认同一结果的迭代(评审轮次、重试)只记第一次;只描述"分析过程"的不记。跳过时 observer 回 `<skip_summary reason="noise" />`。
+
+**中文模式有没有这套规则:有。** `code--zh.json` 只有 15 个键(翻译占位符),不含这两段;但 worker 的 `loadMode` 用 `parseInheritance` 按 `--` 把 `code--zh` 拆成父 `code` + 覆盖 `code--zh`,再 `deepMerge`(覆盖方有的键盖掉父,其余沿用父)。所以这两段规则对 `code--zh` 一直生效。依据:读 `worker-service.cjs` 的 `loadMode`/`parseInheritance`/`deepMerge`,**没有实测 observer 的行为**。
+
+**实际现象:** 记忆整理这类多步操作(写新记忆、归档、删旧、复核),每一步都会各记一条"过程记忆",一次整理约 3 到 4 条。推测原因(推断,没验证):
+- observer 按**单个会话**判断"是否已记过",子会话之间互相看不见;
+- 每一步在它眼里都是新事实(写入了 #X、归档了 #Y),不算重复。
+
+OpenCode 插件不发 `agentId`/`agentType`,`SKIP_SUBAGENT_OBSERVATIONS` 也压不住子会话,这一点见上面"没解决的"。
+
+**原理:这个文件到底改了什么(读 `worker-service.cjs` 得出)**
+
+1. **改的是 observer 的系统提示词。** 拼提示词的函数(`QGe`)按顺序把 `system_identity`、`observer_role`、`spatial_awareness`、`recording_focus`、`skip_guidance`、类型说明等段落拼成一段。`skip_guidance` 在其中原样出现,覆盖文件只是把这一段文字换掉,新增的规则就成了提示词里的一行。
+2. **判断是 observer 这个 LLM 做的,不是程序。** 每来一条工具调用,observer 读完提示词,自己决定回两种东西之一:
+   - 一个或多个 `<observation>…</observation>`:要记;
+   - `<skip_summary reason="noise" />`:跳过。
+3. **worker 只认格式。** 解析函数(`V6e`)看到回复里有 `<skip_summary … />`,就返回"空观察列表 + 已跳过",**不写库**,这条就没了。回复既不是观察也不是 skip 的(比如写了一句"跳过这条"之类的话),提示词里写明会**再问一次,仍不对就丢弃**。
+4. **程序里没有"匹配到整理回执就丢"的逻辑。** 全靠模型照着提示词里那一行执行。
+
+**这决定了两个限制:**
+- **软规则,不保证。** 模型可能把"已归档 #1482"当成有价值的发现照记。第 6 条能压住多少,只能实测。
+- **只管观察条目的生成。** 工具调用本身仍然送进 worker,原始调用另外同步落库(`upsertToolUse`)。这部分不进开场注入的 50 条,不占名额。
+
+**和 `SKIP_TOOLS` 的区别:** `SKIP_TOOLS` 在入队前按工具名拦,是硬规则,但只能按工具名,拦不了"整理流程里的 shell 调用"而不误伤别的 shell。`skip_guidance` 是 observer 看到内容后自己判断,能按"这件事是不是整理回执"来跳过,但不保证。两者是两道关,可以同时用。
+
+**可选的调法(没实测):** 不改插件文件(更新会被覆盖),用官方支持的覆盖 mode:
+1. 新建 `~/.claude-mem/modes/code--zh--<名字>.json`(用户 mode 目录,见 [[claude-mem-配置详解]] 的 modes 说明),只写 `prompts.skip_guidance`,在默认文本基础上加一条"记忆整理等流程的操作回执(写入、归档、删除、复核确认)一律跳过,只记最终结论和踩坑"。
+2. 把 `CLAUDE_MEM_MODE` 改成新 ID,重启 worker。
+3. 回退:`MODE` 改回 `code--zh`,删掉覆盖文件。
+
+**注意:** `MODE` 是全局的,影响所有项目;重启 worker 会中断正在被记录的会话;`skip_guidance` 是给 LLM 的文字规则,能压住多少没测。
+
+#### 覆盖文件的草稿(只在文档里,磁盘上还没建)
+
+**文件名和 `MODE` 的值不是同一个字符串,这里最容易搞错:**
+- `CLAUDE_MEM_MODE` 填 `code--zh--lean`;
+- worker 按 `--` 把它拆成父 `code`,加上两个覆盖 `code--zh`、`code--lean`,**按这个顺序**逐个 `deepMerge`;
+- `code--zh` 是内置的(插件自带);`code--lean` 不是内置的,所以去用户目录找,文件就叫 **`~/.claude-mem/modes/code--lean.json`**(不是 `code--zh--lean.json`)。
+- 这样中文翻译键来自 `code--zh`,`skip_guidance` 来自最后合并的 `code--lean`,互不冲突。
+- 用户目录里的同名文件如果和内置 mode 重名(比如叫 `code--zh.json`),会被忽略并报错 `bundled mode cannot be shadowed`,所以名字不能取成内置的。
+
+该目录现在**不存在**,要建的话先 `mkdir -p ~/.claude-mem/modes`。
+
+写法依据:覆盖文件**只需要写要覆盖的那一个键**,其余键不用重复(合并后才校验完整性)。`skip_guidance` 是字符串,覆盖会**整段替换**默认文本,所以下面把默认的 5 条原样抄了一遍,只在后面追加 1 条。
+
+```json
+{
+  "name": "Code Development (Chinese, lean)",
+  "prompts": {
+    "skip_guidance": "WHEN TO SKIP\n------------\nSkip routine operations:\n- A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently. This especially applies to iterative loops (PR review rounds, retry cycles, polling) that re-confirm the same outcome multiple times - record it ONCE on first confirmation, then skip all later re-confirmations of the identical fact.\n- Empty status checks\n- Package installations with no errors\n- Simple file listings with no follow-on finding\n- File related research that comes back empty or not found\n- Operation receipts of memory-maintenance work (writing a merged memory, archiving or deleting old memories, \"memory #N written\", \"archived to file X\", re-checking that a deletion happened). Record only the final conclusion and any gotcha learned, never the individual steps.\n\nIf skipping, reply with exactly <skip_summary reason=\"noise\" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose."
+  }
+}
+```
+
+和默认文本的区别只有一处:在"File related research…"后面多了第 6 条,点名"记忆整理的操作回执一律跳过,只记最终结论和踩坑"。其余字符与 `code.json` 一致(从原文逐字复制,不是重写)。
+
+启用步骤(**都还没做**):
+1. `mkdir -p ~/.claude-mem/modes`,把上面的 JSON 写入 `~/.claude-mem/modes/code--lean.json`;
+2. 把 `CLAUDE_MEM_MODE` 改成 `code--zh--lean`(两份 settings.json 里 worker 读哪份没确认,见清单第 13 条);
+3. 重启 worker;
+4. 验证:取 `/api/context/inject` 看开头的 `Mode:` 行是否变化,再做一次整理,数新增过程记忆的条数,对比此前的 3 到 4 条。
+
+已读源码确认的(`loadModeFile`/`loadMode`/`validateMode`):
+- `parseInheritance("code--zh--lean")` 得到父 `code`、覆盖 `code--zh` 和 `code--lean`,所以要建的文件是 `code--lean.json`;
+- `code--lean` 不是内置 mode,`loadModeFile` 会去 `~/.claude-mem/modes/` 找;
+- 校验发生在合并之后,覆盖文件只写 `name` 和 `prompts.skip_guidance` 是可以的;
+- 加载失败不会静默:抛 `Jw` 类错误直接失败,其余错误回退到内置 `code`(英文),所以文件写错的后果是 observer 输出变成英文,看 `Mode:` 行能发现。
+
+仍然没验证的:
+- 实际启动 worker 后合并是否如上述(只读了代码,没跑);
+- LLM 看到新增的第 6 条后,真的会跳过整理回执,还是照记。
 
 ### 怎么验证
 
@@ -692,3 +770,4 @@ B 就是之前推论的情形:近 90 天里只要有一条不相干的向量结�
 10. DSH 写入记忆时用的来源名:已实测是 `dsh`。
 11. 两端同目录算出的项目名是否一致:已实测一致(都是 `my-note`),但取决于在哪个目录开 DSH。
 12. 图片采集的具体上限(本地 3 MiB、给模型 256 KiB、每事件最多 4 张)来自源码注释,没实测。
+13. 覆盖 mode 的 `skip_guidance` 能压住多少"过程记忆"(整理流程的写入/归档/复核回执):没测。改 `MODE` 后是否必须重启 worker、两份 `settings.json` 里 worker 实际读哪份:也没确认。见第 3 轮"observer 的跳过规则"。

@@ -216,10 +216,10 @@ footer                 收尾约束
 
 **B. 该记什么、该跳过什么(最常改)**
 
-| 键 | 默认内容 | 改它能干什么 |
-|---|---|---|
-| `recording_focus` | `WHAT TO RECORD`:只记持久的技术信号,附好/坏例子;"本会话已记过的事实不要再记" | 收紧或放宽记录标准,比如只记决策和踩坑 |
-| `skip_guidance` | `WHEN TO SKIP`:已记过的、空状态检查、无错误的安装、无后续发现的文件列表、查无结果的研究;回 `<skip_summary reason="noise" />` | 加入"某类操作一律跳过" |
+| 键                 | 默认内容                                                                                    | 改它能干什么              |
+| ----------------- | --------------------------------------------------------------------------------------- | ------------------- |
+| `recording_focus` | `WHAT TO RECORD`:只记持久的技术信号,附好/坏例子;"本会话已记过的事实不要再记"                                       | 收紧或放宽记录标准,比如只记决策和踩坑 |
+| `skip_guidance`   | `WHEN TO SKIP`:已记过的、空状态检查、无错误的安装、无后续发现的文件列表、查无结果的研究;回 `<skip_summary reason="noise" />` | 加入"某类操作一律跳过"        |
 
 `code--chill.json` 就是靠重写这两个键,把 observer 改成"只记痛苦才能重新发现的东西"的选择性模式,可作写法参照(该文件是语言变体之外的风格变体,按 `code--<风格>` 命名)。
 
@@ -262,15 +262,35 @@ footer                 收尾约束
 
 ### 5.2 最小例子:让 observer 跳过"操作回执"
 
-文件 `~/.claude-mem/modes/code--lean.json`(**已建在磁盘上,尚未启用**)。规则正文写成中文,方便人审;observer 是 LLM,读中文指令没问题,输出本来也要求中文。
+文件 `~/.claude-mem/modes/code--lean.json`(**已建并已启用**,2026-11-10)。
+
+**磁盘上写的是英文,中文只是给人审的对照。** observer 的底座提示词是英文,规则也写英文,风格统一;中文版在本节后面,改规则时先改中文版审定,再译成英文写进文件。
+
+磁盘文件原文(实际生效):
 
 ```json
 {
   "name": "Code Development (Chinese, lean)",
   "prompts": {
-    "skip_guidance": "何时跳过\n------------\n跳过例行操作:\n- 本会话中你已经记录过的事实、决策或修复状态,即使换了说法也不要再记。尤其是反复确认同一结果的循环(评审轮次、重试、轮询):只在第一次确认时记一次,之后对同一事实的再次确认一律跳过。\n- 空的状态检查\n- 没有报错的软件包安装\n- 没有后续发现的简单文件列表\n- 查无结果的文件相关调研\n- 只说明\"做了某一步\"或\"结果符合预期\"的操作回执,例如:写入了一条记忆、归档或删除了旧记忆、\"记忆 #N 已写入\"、\"已归档到文件 X\"、复查确认删除生效、提交或推送完成。这类回执只有在结果出乎意料,或其中包含决策、根因、踩坑时才记。\n\n如果要跳过,请严格只回复 <skip_summary reason=\"noise\" />(reason 属性里写一句简短理由),不要回复其他任何内容。不要回复空内容,也不要用文字解释为什么跳过。"
+    "skip_guidance": "WHEN TO SKIP\n------------\nSkip routine operations:\n- A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently. This especially applies to iterative loops (PR review rounds, retry cycles, polling) that re-confirm the same outcome multiple times - record it ONCE on first confirmation, then skip all later re-confirmations of the identical fact.\n- Empty status checks\n- Package installations with no errors\n- Simple file listings with no follow-on finding\n- File related research that comes back empty or not found\n- Operation receipts that only state a step was performed, or that its result matched expectations (e.g. a memory was written, old memories were archived or deleted, \"memory #N written\", \"archived to file X\", re-checking that a deletion took effect, a commit or push completed). Record such a receipt only if its result was unexpected, or if it contains a decision, root cause, or gotcha.\n\nIf skipping, reply with exactly <skip_summary reason=\"noise\" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose."
   }
 }
+```
+
+中文对照(**不放进配置**,只给人审):
+
+```text
+何时跳过
+------------
+跳过例行操作:
+- 本会话中你已经记录过的事实、决策或修复状态,即使换了说法也不要再记。尤其是反复确认同一结果的循环(评审轮次、重试、轮询):只在第一次确认时记一次,之后对同一事实的再次确认一律跳过。
+- 空的状态检查
+- 没有报错的软件包安装
+- 没有后续发现的简单文件列表
+- 查无结果的文件相关调研
+- 只说明"做了某一步"或"结果符合预期"的操作回执,例如:写入了一条记忆、归档或删除了旧记忆、"记忆 #N 已写入"、"已归档到文件 X"、复查确认删除生效、提交或推送完成。这类回执只有在结果出乎意料,或其中包含决策、根因、踩坑时才记。
+
+如果要跳过,请严格只回复 <skip_summary reason="noise" />(reason 属性里写一句简短理由),不要回复其他任何内容。不要回复空内容,也不要用文字解释为什么跳过。
 ```
 
 **要点:**
@@ -300,7 +320,7 @@ Skip routine operations:
 If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose.
 ```
 
-加了第 6 条之后的英文等价版本(中文版与它逐条对应):
+加了第 6 条之后的英文版本(**就是磁盘文件里的内容**,中文对照与它逐条对应):
 
 ```text
 WHEN TO SKIP
@@ -318,15 +338,15 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 中英逐条对应:
 
-| # | 英文(默认) | 中文版 |
-|---|---|---|
-| 1 | A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently… | 本会话中你已经记录过的事实、决策或修复状态,即使换了说法也不要再记… |
-| 2 | Empty status checks | 空的状态检查 |
-| 3 | Package installations with no errors | 没有报错的软件包安装 |
-| 4 | Simple file listings with no follow-on finding | 没有后续发现的简单文件列表 |
-| 5 | File related research that comes back empty or not found | 查无结果的文件相关调研 |
-| 6(新增) | Operation receipts that only state a step was performed, or that its result matched expectations… | 只说明"做了某一步"或"结果符合预期"的操作回执… |
-| 末尾 | If skipping, reply with exactly `<skip_summary reason="noise" />`… | 如果要跳过,请严格只回复 `<skip_summary reason="noise" />`… |
+| #     | 英文(默认)                                                                                                          | 中文版                                             |
+| ----- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| 1     | A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently… | 本会话中你已经记录过的事实、决策或修复状态,即使换了说法也不要再记…              |
+| 2     | Empty status checks                                                                                             | 空的状态检查                                          |
+| 3     | Package installations with no errors                                                                            | 没有报错的软件包安装                                      |
+| 4     | Simple file listings with no follow-on finding                                                                  | 没有后续发现的简单文件列表                                   |
+| 5     | File related research that comes back empty or not found                                                        | 查无结果的文件相关调研                                     |
+| 6(新增) | Operation receipts that only state a step was performed, or that its result matched expectations…               | 只说明"做了某一步"或"结果符合预期"的操作回执…                       |
+| 末尾    | If skipping, reply with exactly `<skip_summary reason="noise" />`…                                              | 如果要跳过,请严格只回复 `<skip_summary reason="noise" />`… |
 
 ### 5.3 一个文件只做一件事,多个文件按需组合
 
@@ -389,10 +409,12 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 | 项 | 状态 |
 |---|---|
-| `CLAUDE_MEM_MODE` | `code--zh`(未改) |
-| `~/.config/opencode/claude-mem/modes/code--lean.json` | 已建,内容见 5.2 |
+| `CLAUDE_MEM_MODE` | `code--zh--lean`(已改,2026-11-10 10:56 重启 worker 生效) |
+| `~/.config/opencode/claude-mem/modes/code--lean.json` | 已建,**英文**,内容见 5.2 |
 | `~/.claude-mem/modes` | 软链到上面的目录 |
-| 是否启用 | **否**,`MODE` 还没改,worker 没重启 |
+| 是否启用 | **是**。开场注入第一行为 `Mode: Code Development (Chinese, lean) (code--zh--lean)`,worker 日志有 `Mode loaded: code--zh--lean`,无回退报错 |
+| 重启时的警告 | 日志有 `Self-replacing worker handoff did not verify in time — falling back to CLI spawn`:旧 worker 没能自己交接,退回命令行拉起了新的(pid 74935);mode 已正常加载,没深究原因 |
+| 启用前基线 | my-note 最大观察 ID 1787,共 1256 条 |
 
 ---
 
@@ -422,6 +444,7 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 5. 叠加文件数量上限、提示词变长对成本的影响:源码里没找到上限,成本没测。
 6. 本机两份配置(`~/.claude-mem/settings.json` 与 `~/.config/opencode/claude-mem/settings.json`):已确认前者是软链指向后者,是同一个文件。
 7. DSH 端是否读同一个用户 mode 目录:没查。
+9. 第 6 条只管"回执",**不管"中间步骤"**(如"撰写合并记忆正文""精简正文"这类为得出结论而做的中间一步)。内置 `code--chill` 的 `recording_focus` 有"Incremental steps toward a goal (just record the final result)",是同一个意思。已想好第 7 条草稿(见 11 节),**暂不加**,先测第 6 条单独的效果。
 8. 第 6 条与那句硬编码的"调试发现应当记录"冲突时,observer 听谁的:没测。基线表里的分类是按标题关键词粗分的,不是读全文判定。
 
 ---
@@ -438,3 +461,28 @@ CLAUDE_MEM_MODE = code--zh--lean
 校验:合并之后才校验;缺键/类型错 → 回退到内置 code(英文)
 看生效:开场注入第一行 "Mode: <name> (<id>)"
 ```
+
+---
+
+## 12. 候选第 7 条:中间步骤(暂不启用)
+
+**为什么有这条:** 第 6 条管的是"回执"(做了某一步、结果符合预期),不管"中间步骤"(为得出结论而做的草稿、修改、复查)。库里 #1508「撰写合并记忆正文」、#1509「精简合并记忆中退出码测法建议」就属于后者。
+
+**难点:** observer 逐条看工具调用,能看到之前的调用(日志里 `messagesInContext` 在涨),但**看不到后面还有没有**,没法判断"这是不是最终结论"。所以不能写成"只记最终结果",要写成它当场能判断的标准。
+
+英文(写进配置的版本):
+
+```text
+- Intermediate steps toward a goal (drafting or editing a text, trying a variant, re-checking, preparing inputs). Record the outcome once it is finished or a stable conclusion is reached; skip the steps in between unless a step by itself reveals a new fact, decision, or gotcha.
+```
+
+中文(给人审):
+
+> 为达成某个目标而做的中间步骤(起草或修改文本、尝试某个写法、复查、准备输入)。等结果完成或得出稳定结论时再记一次;中间各步不记,除非某一步本身就揭示了新的事实、决策或踩坑。
+
+**风险:**
+- 比第 6 条更容易误伤:一次真正的发现,如果 observer 觉得"还没到稳定结论",可能被跳过;
+- 那句写死在 worker 里的"调试发现应当记录"会和它冲突,调研类仍可能被放行;
+- "稳定结论"observer 自己也未必判断得准。
+
+**怎么上:** 先只用第 6 条测一轮,数条数,看第 6 条单独压住多少;再决定加不加第 7 条。一次只加一条,否则条数下降时分不清是哪条起的作用。加了要再重启一次 worker。

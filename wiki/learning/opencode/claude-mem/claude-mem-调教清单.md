@@ -380,7 +380,7 @@ OpenCode 插件不发 `agentId`/`agentType`,`SKIP_SUBAGENT_OBSERVATIONS` 也压�
 
 **注意:** `MODE` 是全局的,影响所有项目;重启 worker 会中断正在被记录的会话;`skip_guidance` 是给 LLM 的文字规则,能压住多少没测。
 
-#### 覆盖文件(已建在磁盘上,尚未启用)
+#### 覆盖文件(已建并已启用,2026-11-10)
 
 **文件名和 `MODE` 的值不是同一个字符串,这里最容易搞错:**
 - `CLAUDE_MEM_MODE` 填 `code--zh--lean`;
@@ -391,24 +391,24 @@ OpenCode 插件不发 `agentId`/`agentType`,`SKIP_SUBAGENT_OBSERVATIONS` 也压�
 
 `~/.claude-mem/modes` 是软链,指向 `~/.config/opencode/claude-mem/modes/`(和 `settings.json` 一样随配置仓库走)。
 
-写法:覆盖文件**只需要写要覆盖的那一个键**(合并后才校验完整性)。`skip_guidance` 是字符串,覆盖会**整段替换**默认文本,所以前 5 条是对默认英文的逐条直译,只在后面追加第 6 条。规则本身改成了**中文**,方便人审;只有末尾的 `<skip_summary reason="noise" />` 标签必须原样保留,worker 用正则解析它。
+写法:覆盖文件**只需要写要覆盖的那一个键**(合并后才校验完整性)。`skip_guidance` 是字符串,覆盖会**整段替换**默认文本,所以前 5 条原样抄默认英文,只在后面追加第 6 条。**磁盘上写的是英文**(底座提示词是英文,风格统一);中文版只给人审,放在 [[claude-mem-mode文件与覆盖机制]] 5.2。末尾的 `<skip_summary reason="noise" />` 标签必须原样保留,worker 用正则解析它。
 
 ```json
 {
   "name": "Code Development (Chinese, lean)",
   "prompts": {
-    "skip_guidance": "何时跳过\n------------\n跳过例行操作:\n- 本会话中你已经记录过的事实、决策或修复状态,即使换了说法也不要再记。尤其是反复确认同一结果的循环(评审轮次、重试、轮询):只在第一次确认时记一次,之后对同一事实的再次确认一律跳过。\n- 空的状态检查\n- 没有报错的软件包安装\n- 没有后续发现的简单文件列表\n- 查无结果的文件相关调研\n- 只说明\"做了某一步\"或\"结果符合预期\"的操作回执,例如:写入了一条记忆、归档或删除了旧记忆、\"记忆 #N 已写入\"、\"已归档到文件 X\"、复查确认删除生效、提交或推送完成。这类回执只有在结果出乎意料,或其中包含决策、根因、踩坑时才记。\n\n如果要跳过,请严格只回复 <skip_summary reason=\"noise\" />(reason 属性里写一句简短理由),不要回复其他任何内容。不要回复空内容,也不要用文字解释为什么跳过。"
+    "skip_guidance": "WHEN TO SKIP\n------------\nSkip routine operations:\n- A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently. This especially applies to iterative loops (PR review rounds, retry cycles, polling) that re-confirm the same outcome multiple times - record it ONCE on first confirmation, then skip all later re-confirmations of the identical fact.\n- Empty status checks\n- Package installations with no errors\n- Simple file listings with no follow-on finding\n- File related research that comes back empty or not found\n- Operation receipts that only state a step was performed, or that its result matched expectations (e.g. a memory was written, old memories were archived or deleted, \"memory #N written\", \"archived to file X\", re-checking that a deletion took effect, a commit or push completed). Record such a receipt only if its result was unexpected, or if it contains a decision, root cause, or gotcha.\n\nIf skipping, reply with exactly <skip_summary reason=\"noise\" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose."
   }
 }
 ```
 
 第 6 条是"判断标准"而不是"清单":只说明"做了某一步"或"结果符合预期"的回执一律跳过,**这类回执如果结果出乎意料、或包含决策、根因、踩坑,仍然要记**(限定"这类回执",避免被读成"所有观察都只有这几种才记")。英文对照和逐条说明见 [[claude-mem-mode文件与覆盖机制]] 5.2。
 
-启用步骤(**都还没做**):
-1. 确认文件和软链在:`ls -la ~/.claude-mem/modes/code--lean.json`(`~/.claude-mem/modes` 已软链到 `~/.config/opencode/claude-mem/modes/`);
-2. 把 `CLAUDE_MEM_MODE` 改成 `code--zh--lean`(两份 settings.json 里 worker 读哪份没确认,见清单第 13 条);
-3. 重启 worker;
-4. 验证:取 `/api/context/inject` 看开头的 `Mode:` 行是否变化,再做一次整理,数新增过程记忆的条数,对比此前的 3 到 4 条。
+启用步骤(**已做,2026-11-10 10:56**):
+1. 文件和软链:`ls -la ~/.claude-mem/modes/code--lean.json`(`~/.claude-mem/modes` 已软链到 `~/.config/opencode/claude-mem/modes/`);
+2. `CLAUDE_MEM_MODE` 已从 `code--zh` 改成 `code--zh--lean`(`~/.claude-mem/settings.json` 是软链,指向配置仓库里的同一个文件,不存在"读哪份"的问题;`settings.example.jsonc` 已同步);
+3. `npx claude-mem restart` 已重启 worker(日志有一条 handoff 超时警告、退回命令行拉起,新 worker 正常);
+4. 验证:开场注入第一行已是 `Mode: Code Development (Chinese, lean) (code--zh--lean)`,日志有 `Mode loaded: code--zh--lean`。**效果验证(数新增过程记忆条数)还没做**,启用前基线见 [[claude-mem-mode文件与覆盖机制]] 9.1。
 
 已读源码确认的(`loadModeFile`/`loadMode`/`validateMode`):
 - `parseInheritance("code--zh--lean")` 得到父 `code`、覆盖 `code--zh` 和 `code--lean`,所以要建的文件是 `code--lean.json`;
@@ -773,4 +773,4 @@ B 就是之前推论的情形:近 90 天里只要有一条不相干的向量结�
 10. DSH 写入记忆时用的来源名:已实测是 `dsh`。
 11. 两端同目录算出的项目名是否一致:已实测一致(都是 `my-note`),但取决于在哪个目录开 DSH。
 12. 图片采集的具体上限(本地 3 MiB、给模型 256 KiB、每事件最多 4 张)来自源码注释,没实测。
-13. 覆盖 mode 的 `skip_guidance` 能压住多少"过程记忆"(整理流程的写入/归档/复核回执):没测。改 `MODE` 后是否必须重启 worker、两份 `settings.json` 里 worker 实际读哪份:也没确认。见第 3 轮"observer 的跳过规则"。
+13. 覆盖 mode 的 `skip_guidance` 能压住多少"过程记忆"(整理流程的写入/归档/复核回执):没测。改 `MODE` 后是否必须重启 worker:启用时按重启做了,**没试过不重启是否热读**。(两份 `settings.json` 是同一个文件的软链,已确认,不存在读哪份的问题。)见第 3 轮"observer 的跳过规则"。

@@ -260,7 +260,7 @@ footer                 收尾约束
 4. 重启 worker(推断:`loadMode` 在启动时加载,没验证是否热读)。
 5. 验证:看开场注入的 `Mode:` 行,再观察新记忆的数量和内容。
 
-### 5.2 最小例子:让 observer 跳过"操作回执"
+### 5.2 最小例子:让 observer 跳过"记忆维护调用"和"操作回执"
 
 文件 `~/.claude-mem/modes/code--lean.json`(**已建并已启用**,2026-11-10)。
 
@@ -272,7 +272,7 @@ footer                 收尾约束
 {
   "name": "Code Development (Chinese, lean)",
   "prompts": {
-    "skip_guidance": "WHEN TO SKIP\n------------\nSkip routine operations:\n- A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently. This especially applies to iterative loops (PR review rounds, retry cycles, polling) that re-confirm the same outcome multiple times - record it ONCE on first confirmation, then skip all later re-confirmations of the identical fact.\n- Empty status checks\n- Package installations with no errors\n- Simple file listings with no follow-on finding\n- File related research that comes back empty or not found\n- Operation receipts that only state a step was performed, or that its result matched expectations (e.g. a memory was written, old memories were archived or deleted, \"memory #N written\", \"archived to file X\", re-checking that a deletion took effect, a commit or push completed). Record such a receipt only if its result was unexpected, or if it contains a decision, root cause, or gotcha.\n\nIf skipping, reply with exactly <skip_summary reason=\"noise\" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose."
+    "skip_guidance": "WHEN TO SKIP\n------------\nSkip routine operations:\n- A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently. This especially applies to iterative loops (PR review rounds, retry cycles, polling) that re-confirm the same outcome multiple times - record it ONCE on first confirmation, then skip all later re-confirmations of the identical fact.\n- Empty status checks\n- Package installations with no errors\n- Simple file listings with no follow-on finding\n- File related research that comes back empty or not found\n- Memory-maintenance calls whose content is already stored as a memory: writing a merged memory (write_memory.py, save_memory, /api/import), archiving or deleting old memories (archive_delete.py), restoring from an archive (restore_archive.py), and lookups that only confirm those memory IDs exist or are gone. Skip them even if the output contains detailed facts: those facts are already in the stored memory, so recording them again only duplicates it. Record such a call only if it FAILED (non-zero exit, error, or rejected input) or revealed a bug in the tooling itself.\n- Other operation receipts that only state a step was performed, or that its result matched expectations (e.g. a commit or push completed). Record such a receipt only if its result was unexpected, or if it contains a decision, root cause, or gotcha.\n\nIf skipping, reply with exactly <skip_summary reason=\"noise\" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose."
   }
 }
 ```
@@ -288,19 +288,26 @@ footer                 收尾约束
 - 没有报错的软件包安装
 - 没有后续发现的简单文件列表
 - 查无结果的文件相关调研
-- 只说明"做了某一步"或"结果符合预期"的操作回执,例如:写入了一条记忆、归档或删除了旧记忆、"记忆 #N 已写入"、"已归档到文件 X"、复查确认删除生效、提交或推送完成。这类回执只有在结果出乎意料,或其中包含决策、根因、踩坑时才记。
+- 内容已存进记忆库的记忆维护类调用:写入融合记忆(write_memory.py、save_memory、/api/import)、归档或删除旧记忆(archive_delete.py)、从归档恢复(restore_archive.py),以及只为确认这些记忆 ID 存在或已消失的查询。即使输出里有很详细的事实也跳过:这些事实已经在写入的记忆里了,再记一遍只是重复。只有调用失败(退出码非零、报错、输入被拒),或暴露了工具本身的缺陷时才记。
+- 其他只说明"做了某一步"或"结果符合预期"的操作回执(例如提交或推送完成)。这类回执只有在结果出乎意料,或其中包含决策、根因、踩坑时才记。
 
 如果要跳过,请严格只回复 <skip_summary reason="noise" />(reason 属性里写一句简短理由),不要回复其他任何内容。不要回复空内容,也不要用文字解释为什么跳过。
 ```
 
 **要点:**
-- `skip_guidance` 是字符串,覆盖是**整段替换**,所以默认的 5 条要自己抄一遍(这里是逐条直译),只在后面加第 6 条;
+- `skip_guidance` 是字符串,覆盖是**整段替换**,所以默认的 5 条要自己抄一遍,只在后面追加新条(现在是第 6、7 条);
 - 末尾 `<skip_summary reason="noise" />` **必须原样保留**:worker 用正则 `/<skip_summary(?:\s+reason="([^"]*)")?\s*\/>/i` 解析,写错一个字符就会被当成格式错误,再问一次,仍不对就丢弃。`reason` 属性里的理由可以写中文;
 - `MODE` 要写 `code--zh--lean`(带 `zh` 才保留中文)。
 
-**第 6 条的设计:** 写成"判断标准"而不是"清单"。
+**第 6 条第一版的实测结果(2026-11-10 11:08,失败):** 一次整理三组共 8 条旧记忆,新增 7 条过程记忆。其中 #1813、#1815、#1817 各自紧跟一条真融合记忆(同一秒生成,标题几乎一字不差,正文是"第 N 组融合为 #XXXX……"),#1818 是"三组均完成并归档"。这 4 条正是第 6 条点名要跳过的回执,**一条都没跳**。判断原因(推断,没法区分):回执正文夹着具体细节(如"created_at 置为当前时间规避相同时间戳跳过"),observer 把它当成"含踩坑"走了例外口子。
+
+**所以改成第二版(现行):** 不再让 observer 判断"内容有没有踩坑",改成按**调用类型**一刀切——记忆维护类调用(write_memory.py、archive_delete.py、restore_archive.py、保存/查询记忆)内容已存进记忆库,**即使输出有详细事实也跳过**,只有**调用失败**或**暴露工具本身的缺陷**才记;提交推送类回执保留原来的判断标准,拆成第 7 条。风险:调试这些脚本本身时,真实发现也可能被跳过;规则依赖脚本名,脚本改名要同步改。第二版效果见下一节的复测。
+
+---
+
+**第一版的设计思路(保留作参考):** 写成"判断标准"而不是"清单"。
 - 判断标准:这条记录**只说明做了某一步,或结果符合预期**吗?是就跳过;
-- 保留口子:**这类回执**如果结果出乎意料,或包含**决策、根因、踩坑**,仍然要记。(措辞曾写成"只有出乎意料的结果……才记",没限定"这类回执",可能被 observer 读成"所有观察都只有这几种才记"而过度跳过,所以改成现在的写法,把范围锁在第 6 条自己身上。)比如"复查发现删除没生效"是坑,会被记下来;"复查确认删除生效"只是回执,会被跳过;
+- 保留口子:**这类回执**如果结果出乎意料,或包含**决策、根因、踩坑**,仍然要记。(措辞曾写成"只有出乎意料的结果……才记",没限定"这类回执",可能被 observer 读成"所有观察都只有这几种才记"而过度跳过,所以改成现在的写法,把范围锁在第 6 条(第一版)自己身上。)比如"复查发现删除没生效"是坑,会被记下来;"复查确认删除生效"只是回执,会被跳过;
 - 覆盖面比"只管记忆整理"更宽:提交、推送完成也算回执。代价是误伤风险更高,上线后要观察几天,看有没有真正有价值的修复被跳过。
 
 **英文对照**(给以后对照用,**不放进提示词**,放进去每次调用都多读一遍):
@@ -320,7 +327,7 @@ Skip routine operations:
 If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose.
 ```
 
-加了第 6 条之后的英文版本(**就是磁盘文件里的内容**,中文对照与它逐条对应):
+加了第 6、7 条之后的英文版本(**就是磁盘文件里的内容**,中文对照与它逐条对应):
 
 ```text
 WHEN TO SKIP
@@ -331,7 +338,8 @@ Skip routine operations:
 - Package installations with no errors
 - Simple file listings with no follow-on finding
 - File related research that comes back empty or not found
-- Operation receipts that only state a step was performed, or that its result matched expectations (e.g. a memory was written, old memories were archived or deleted, "memory #N written", "archived to file X", re-checking that a deletion took effect, a commit or push completed). Record such a receipt only if its result was unexpected, or if it contains a decision, root cause, or gotcha.
+- Memory-maintenance calls whose content is already stored as a memory: writing a merged memory (write_memory.py, save_memory, /api/import), archiving or deleting old memories (archive_delete.py), restoring from an archive (restore_archive.py), and lookups that only confirm those memory IDs exist or are gone. Skip them even if the output contains detailed facts: those facts are already in the stored memory, so recording them again only duplicates it. Record such a call only if it FAILED (non-zero exit, error, or rejected input) or revealed a bug in the tooling itself.
+- Other operation receipts that only state a step was performed, or that its result matched expectations (e.g. a commit or push completed). Record such a receipt only if its result was unexpected, or if it contains a decision, root cause, or gotcha.
 
 If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose.
 ```
@@ -345,14 +353,15 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 | 3     | Package installations with no errors                                                                            | 没有报错的软件包安装                                      |
 | 4     | Simple file listings with no follow-on finding                                                                  | 没有后续发现的简单文件列表                                   |
 | 5     | File related research that comes back empty or not found                                                        | 查无结果的文件相关调研                                     |
-| 6(新增) | Operation receipts that only state a step was performed, or that its result matched expectations…               | 只说明"做了某一步"或"结果符合预期"的操作回执…                       |
+| 6(新增,第二版) | Memory-maintenance calls whose content is already stored as a memory… Record such a call only if it FAILED… | 内容已存进记忆库的记忆维护类调用…只有调用失败…才记 |
+| 7(新增) | Other operation receipts that only state a step was performed, or that its result matched expectations… | 其他只说明"做了某一步"或"结果符合预期"的操作回执… |
 | 末尾    | If skipping, reply with exactly `<skip_summary reason="noise" />`…                                              | 如果要跳过,请严格只回复 `<skip_summary reason="noise" />`… |
 
 ### 5.3 一个文件只做一件事,多个文件按需组合
 
 | 文件 | 管哪个键 | 效果 |
 |---|---|---|
-| `code--lean.json` | `skip_guidance` | 操作回执(只说明做了某步、结果符合预期)一律跳过 |
+| `code--lean.json` | `skip_guidance` | 记忆维护类调用(写入/归档/恢复记忆)一律跳过,除非失败;其他操作回执(提交推送等)结果符合预期就跳过 |
 | `code--focus.json`(设想) | `recording_focus` | 只记决策、踩坑、已发布的修复 |
 | `code--tags.json`(设想) | `observation_concepts` + `concept_guidance` | 增加自定义概念标签 |
 
@@ -375,7 +384,7 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 > Return either one or more `<observation>` blocks, or `<skip_summary reason="noise" />` if this tool use should be skipped. **Concrete debugging findings from logs, queue state, database rows, session routing, or code-path inspection count as durable discoveries and should be recorded.**
 
-意思是:读日志、读数据库、读源码得到的具体发现,算持久发现,应当记录。它和 `skip_guidance` 并存,mode 覆盖不到。实测的后果:调研类的工具调用(读源码、读配置)大多被它放行,是 my-note 过程记忆里最大的一类。所以 `skip_guidance` 加第 6 条,**主要压得住"操作回执"这一类,压不住"调研发现"这一类**。
+意思是:读日志、读数据库、读源码得到的具体发现,算持久发现,应当记录。它和 `skip_guidance` 并存,mode 覆盖不到。实测的后果:调研类的工具调用(读源码、读配置)大多被它放行,是 my-note 过程记忆里最大的一类。所以 `skip_guidance` 加的第 6、7 条,**主要想压"记忆维护调用"和"操作回执"这两类,压不住"调研发现"这一类**。
 
 **和 `SKIP_TOOLS` 的区别:**
 - `SKIP_TOOLS`:门口的保安,按工具名拦,**硬规则**,但只能按工具名;
@@ -409,12 +418,14 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 | 项 | 状态 |
 |---|---|
-| `CLAUDE_MEM_MODE` | `code--zh--lean`(已改,2026-11-10 10:56 重启 worker 生效) |
+| `CLAUDE_MEM_MODE` | `code--zh--lean`(2026-11-10 10:56 启用;11:13 第二版规则写入后再次重启 worker) |
 | `~/.config/opencode/claude-mem/modes/code--lean.json` | 已建,**英文**,内容见 5.2 |
 | `~/.claude-mem/modes` | 软链到上面的目录 |
 | 是否启用 | **是**。开场注入第一行为 `Mode: Code Development (Chinese, lean) (code--zh--lean)`,worker 日志有 `Mode loaded: code--zh--lean`,无回退报错 |
 | 重启时的警告 | 日志有 `Self-replacing worker handoff did not verify in time — falling back to CLI spawn`:旧 worker 没能自己交接,退回命令行拉起了新的(pid 74935);mode 已正常加载,没深究原因 |
 | 启用前基线 | my-note 最大观察 ID 1787,共 1256 条 |
+| 第一版规则测试 | 11:03–11:08 测两次,结果见 9.2 |
+| 第二版规则 | 11:13 重启后生效,此时 my-note 最大观察 ID 1824,**效果还没测**(见 9.3) |
 
 ---
 
@@ -422,10 +433,10 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 按标题关键词粗分(不精确),`my-note` 项目 #1505 之后新增 121 条观察:
 
-| 类型 | 大致条数 | 第 6 条能不能挡 |
+| 类型 | 大致条数 | 规则能不能挡(第一版的预期) |
 |---|---|---|
 | 整理回执(已写入、已归档、已删除) | 约 10 | 能,正是它针对的 |
-| 提交推送回执 | 约 8 | 能(第 6 条写了"提交或推送完成") |
+| 提交推送回执 | 约 8 | 能(第一版写了"提交或推送完成";第二版挪到第 7 条) |
 | 复核确认某事实 | 约 15 | 只挡"结果符合预期"的一部分 |
 | 读源码、读配置的调研发现 | 约 47 | **不能**(被上面那句硬编码放行) |
 | 改 SKILL.md 的改动记录 | 约 15 | 不能 |
@@ -433,19 +444,44 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 另一个基线:一次整理产生约 3 到 4 条过程记忆。
 
-启用后的对比方法:同样做一次整理,数新增条数;再看前三类的条数有没有明显下降。**预期只会压住前两类和第三类的一部分,不会压住调研发现**,如果调研类也少了,说明 observer 把第 6 条理解得比字面更宽。
+启用后的对比方法:同样做一次整理,数新增条数;再看前三类的条数有没有明显下降。**预期只会压住前两类和第三类的一部分,不会压住调研发现**,如果调研类也少了,说明 observer 把规则理解得比字面更宽。
+
+### 9.2 第一版规则的实测(11:03 与 11:08)
+
+规则:单条"操作回执"(含记忆整理回执与提交推送回执),按"结果符合预期就跳过,出乎意料或含决策/根因/踩坑才记"判断。
+
+| 测试 | 整理量 | 新增过程记忆 | 其中本该被跳过的回执 | 被跳过 |
+|---|---|---|---|---|
+| 11:03 一组(#1735+#1760) | 2 条合 1 | #1803(#1804 是准备素材时产生,不算) | #1803 一条 | 0 |
+| 11:08 三组(8 条合 3 条) | 3 组 | 7 条:#1809–#1811(判断与决策)、#1813、#1815、#1817(融合记忆的转述)、#1818(完成并归档) | #1813、#1815、#1817、#1818 共 4 条 | **0** |
+
+另有 2 条(#1819、#1820)属于另一个窗口的无关工作,不计。
+
+**结论:** 规则已加载,但 4 次该跳的回执 0 次被跳,没有可见效果。每次融合记忆写入后,observer 紧跟着再记一条转述(时间戳同一秒),这是最稳定的过程记忆来源。原因推断:回执正文夹着具体细节,observer 把它当成"含踩坑"走了例外口子。没法区分是"规则太弱"还是"例外口子被滥用"。
+
+### 9.3 第二版规则(11:13 起)的复测(待做)
+
+第二版把记忆维护类调用单独拆成第 6 条,按**调用类型**一刀切,例外只留给调用失败。复测方法:
+
+1. 新窗口发一个会触发多组整理的任务;
+2. 记下发任务前 my-note 的最大观察 ID(第二版生效时为 1824,可用作起点,但要排除之后产生的无关条目);
+3. 数新增条数,逐条判断是不是"融合记忆的转述"或"整理完成回执";
+4. 对比 9.2:同样 3 组整理,第一版产生 7 条,看第二版能降到几条;
+5. 同时检查有没有误伤:调试 `write_memory.py` 等脚本本身时,有价值的发现是否被跳过。
+
+结果写回本节。
 
 ## 10. 没验证的清单
 
 1. 多段 `MODE`(如 `code--zh--lean`)在真实 worker 里合并后的效果:只读了代码、跑了拆分函数,**没启动 worker 看合并结果**。
 2. 改 `MODE` 后是否必须重启 worker:`loadMode` 看起来在启动时调用,**没验证**是否热读。
-3. `skip_guidance` 加一条后,LLM 能压住多少整理回执类的观察:**没测**。
+3. `skip_guidance` 能压住多少整理回执类的观察:第一版实测 0/4(见 9.2);**第二版没测**。
 4. 数组类键(`observation_types`)整体替换的行为:读 `deepMerge` 得出("数组不是普通对象,取覆盖方"),**没实测**。
 5. 叠加文件数量上限、提示词变长对成本的影响:源码里没找到上限,成本没测。
 6. 本机两份配置(`~/.claude-mem/settings.json` 与 `~/.config/opencode/claude-mem/settings.json`):已确认前者是软链指向后者,是同一个文件。
 7. DSH 端是否读同一个用户 mode 目录:没查。
-9. 第 6 条只管"回执",**不管"中间步骤"**(如"撰写合并记忆正文""精简正文"这类为得出结论而做的中间一步)。内置 `code--chill` 的 `recording_focus` 有"Incremental steps toward a goal (just record the final result)",是同一个意思。已想好第 7 条草稿(见 11 节),**暂不加**,先测第 6 条单独的效果。
-8. 第 6 条与那句硬编码的"调试发现应当记录"冲突时,observer 听谁的:没测。基线表里的分类是按标题关键词粗分的,不是读全文判定。
+9. 第 6、7 条只管"记忆维护调用"和"回执",**不管"中间步骤"**(如"撰写合并记忆正文""精简正文"这类为得出结论而做的中间一步)。内置 `code--chill` 的 `recording_focus` 有"Incremental steps toward a goal (just record the final result)",是同一个意思。已想好第 8 条草稿(见 12 节),**暂不加**,先测第二版第 6、7 条的效果。
+8. 第 6、7 条与那句硬编码的"调试发现应当记录"冲突时,observer 听谁的:没测。基线表里的分类是按标题关键词粗分的,不是读全文判定。
 
 ---
 
@@ -464,9 +500,9 @@ CLAUDE_MEM_MODE = code--zh--lean
 
 ---
 
-## 12. 候选第 7 条:中间步骤(暂不启用)
+## 12. 候选第 8 条:中间步骤(暂不启用)
 
-**为什么有这条:** 第 6 条管的是"回执"(做了某一步、结果符合预期),不管"中间步骤"(为得出结论而做的草稿、修改、复查)。库里 #1508「撰写合并记忆正文」、#1509「精简合并记忆中退出码测法建议」就属于后者。
+**为什么有这条:** 第 6、7 条管的是"记忆维护调用"和"回执",不管"中间步骤"(为得出结论而做的草稿、修改、复查)。库里 #1508「撰写合并记忆正文」、#1509「精简合并记忆中退出码测法建议」就属于后者。
 
 **难点:** observer 逐条看工具调用,能看到之前的调用(日志里 `messagesInContext` 在涨),但**看不到后面还有没有**,没法判断"这是不是最终结论"。所以不能写成"只记最终结果",要写成它当场能判断的标准。
 
@@ -481,8 +517,8 @@ CLAUDE_MEM_MODE = code--zh--lean
 > 为达成某个目标而做的中间步骤(起草或修改文本、尝试某个写法、复查、准备输入)。等结果完成或得出稳定结论时再记一次;中间各步不记,除非某一步本身就揭示了新的事实、决策或踩坑。
 
 **风险:**
-- 比第 6 条更容易误伤:一次真正的发现,如果 observer 觉得"还没到稳定结论",可能被跳过;
+- 比第 6、7 条更容易误伤:一次真正的发现,如果 observer 觉得"还没到稳定结论",可能被跳过;
 - 那句写死在 worker 里的"调试发现应当记录"会和它冲突,调研类仍可能被放行;
 - "稳定结论"observer 自己也未必判断得准。
 
-**怎么上:** 先只用第 6 条测一轮,数条数,看第 6 条单独压住多少;再决定加不加第 7 条。一次只加一条,否则条数下降时分不清是哪条起的作用。加了要再重启一次 worker。
+**怎么上:** 先只用第二版第 6、7 条测一轮,数条数;再决定加不加第 8 条。一次只加一条,否则条数下降时分不清是哪条起的作用。加了要再重启一次 worker。

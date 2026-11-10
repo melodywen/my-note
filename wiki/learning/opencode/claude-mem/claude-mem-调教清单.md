@@ -368,13 +368,13 @@ OpenCode 插件不发 `agentId`/`agentType`,`SKIP_SUBAGENT_OBSERVATIONS` 也压�
 4. **程序里没有"匹配到整理回执就丢"的逻辑。** 全靠模型照着提示词里那一行执行。
 
 **这决定了两个限制:**
-- **软规则,不保证。** 模型可能把"已归档 #1482"当成有价值的发现照记。第 6 条能压住多少,只能实测。
+- **软规则,不保证。** 模型可能把"已归档 #1482"当成有价值的发现照记。规则能压住多少,只能实测。第一版实测 4 次该跳的回执 0 次被跳,已改第二版,见 [[claude-mem-mode文件与覆盖机制]] 9.2。
 - **只管观察条目的生成。** 工具调用本身仍然送进 worker,原始调用另外同步落库(`upsertToolUse`)。这部分不进开场注入的 50 条,不占名额。
 
 **和 `SKIP_TOOLS` 的区别:** `SKIP_TOOLS` 在入队前按工具名拦,是硬规则,但只能按工具名,拦不了"整理流程里的 shell 调用"而不误伤别的 shell。`skip_guidance` 是 observer 看到内容后自己判断,能按"这件事是不是整理回执"来跳过,但不保证。两者是两道关,可以同时用。
 
 **可选的调法(没实测):** 不改插件文件(更新会被覆盖),用官方支持的覆盖 mode:
-1. 新建覆盖文件(用户 mode 目录,见 [[claude-mem-配置详解]] 的 modes 说明;**文件名是 `code--<名字>.json`,不带 `zh`**,原因见 [[claude-mem-mode文件与覆盖机制]] 2.1),只写 `prompts.skip_guidance`,在默认文本基础上加一条"记忆整理等流程的操作回执(写入、归档、删除、复核确认)一律跳过,只记最终结论和踩坑"。
+1. 新建覆盖文件(用户 mode 目录,见 [[claude-mem-配置详解]] 的 modes 说明;**文件名是 `code--<名字>.json`,不带 `zh`**,原因见 [[claude-mem-mode文件与覆盖机制]] 2.1),只写 `prompts.skip_guidance`,在默认文本基础上追加规则:记忆维护类调用(写入/归档/恢复记忆)一律跳过、除非失败;其他操作回执结果符合预期就跳过。具体写法见下面的覆盖文件。
 2. 把 `CLAUDE_MEM_MODE` 改成新 ID,重启 worker。
 3. 回退:`MODE` 改回 `code--zh`,删掉覆盖文件。
 
@@ -391,24 +391,28 @@ OpenCode 插件不发 `agentId`/`agentType`,`SKIP_SUBAGENT_OBSERVATIONS` 也压�
 
 `~/.claude-mem/modes` 是软链,指向 `~/.config/opencode/claude-mem/modes/`(和 `settings.json` 一样随配置仓库走)。
 
-写法:覆盖文件**只需要写要覆盖的那一个键**(合并后才校验完整性)。`skip_guidance` 是字符串,覆盖会**整段替换**默认文本,所以前 5 条原样抄默认英文,只在后面追加第 6 条。**磁盘上写的是英文**(底座提示词是英文,风格统一);中文版只给人审,放在 [[claude-mem-mode文件与覆盖机制]] 5.2。末尾的 `<skip_summary reason="noise" />` 标签必须原样保留,worker 用正则解析它。
+写法:覆盖文件**只需要写要覆盖的那一个键**(合并后才校验完整性)。`skip_guidance` 是字符串,覆盖会**整段替换**默认文本,所以前 5 条原样抄默认英文,只在后面追加第 6、7 条(第 6 条是第二版:按调用类型一刀切,第一版实测 4 次回执 0 次被跳过,详见 mode 文章 5.2)。**磁盘上写的是英文**(底座提示词是英文,风格统一);中文版只给人审,放在 [[claude-mem-mode文件与覆盖机制]] 5.2。末尾的 `<skip_summary reason="noise" />` 标签必须原样保留,worker 用正则解析它。
 
 ```json
 {
   "name": "Code Development (Chinese, lean)",
   "prompts": {
-    "skip_guidance": "WHEN TO SKIP\n------------\nSkip routine operations:\n- A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently. This especially applies to iterative loops (PR review rounds, retry cycles, polling) that re-confirm the same outcome multiple times - record it ONCE on first confirmation, then skip all later re-confirmations of the identical fact.\n- Empty status checks\n- Package installations with no errors\n- Simple file listings with no follow-on finding\n- File related research that comes back empty or not found\n- Operation receipts that only state a step was performed, or that its result matched expectations (e.g. a memory was written, old memories were archived or deleted, \"memory #N written\", \"archived to file X\", re-checking that a deletion took effect, a commit or push completed). Record such a receipt only if its result was unexpected, or if it contains a decision, root cause, or gotcha.\n\nIf skipping, reply with exactly <skip_summary reason=\"noise\" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose."
+    "skip_guidance": "WHEN TO SKIP\n------------\nSkip routine operations:\n- A fact, decision, or fix status you have already recorded earlier in this session, even if phrased differently. This especially applies to iterative loops (PR review rounds, retry cycles, polling) that re-confirm the same outcome multiple times - record it ONCE on first confirmation, then skip all later re-confirmations of the identical fact.\n- Empty status checks\n- Package installations with no errors\n- Simple file listings with no follow-on finding\n- File related research that comes back empty or not found\n- Memory-maintenance calls whose content is already stored as a memory: writing a merged memory (write_memory.py, save_memory, /api/import), archiving or deleting old memories (archive_delete.py), restoring from an archive (restore_archive.py), and lookups that only confirm those memory IDs exist or are gone. Skip them even if the output contains detailed facts: those facts are already in the stored memory, so recording them again only duplicates it. Record such a call only if it FAILED (non-zero exit, error, or rejected input) or revealed a bug in the tooling itself.\n- Other operation receipts that only state a step was performed, or that its result matched expectations (e.g. a commit or push completed). Record such a receipt only if its result was unexpected, or if it contains a decision, root cause, or gotcha.\n\nIf skipping, reply with exactly <skip_summary reason=\"noise\" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose."
   }
 }
 ```
 
-第 6 条是"判断标准"而不是"清单":只说明"做了某一步"或"结果符合预期"的回执一律跳过,**这类回执如果结果出乎意料、或包含决策、根因、踩坑,仍然要记**(限定"这类回执",避免被读成"所有观察都只有这几种才记")。英文对照和逐条说明见 [[claude-mem-mode文件与覆盖机制]] 5.2。
+**两条新规则:**
+- **第 6 条(记忆维护调用,第二版):** 写入/归档/恢复记忆这类调用,内容已存进记忆库,**按调用类型一刀切**,即使输出有详细事实也跳过;只有调用失败或暴露工具本身缺陷才记。
+- **第 7 条(其他操作回执):** 提交推送等只说明"做了某一步"的回执,结果符合预期就跳过;出乎意料或含决策/根因/踩坑才记(限定"这类回执",避免被读成"所有观察都只有这几种才记")。
+
+**为什么有两版:** 第一版把这两类合成一条,让 observer 判断"有没有踩坑"。实测(11:03、11:08)4 次该跳的回执 0 次被跳,原因推断是回执正文夹着细节、被当成"含踩坑"放行。第二版把记忆维护类拆出来按调用类型一刀切。第二版 11:13 生效,**效果还没测**。英文对照、实测数据和复测方法见 [[claude-mem-mode文件与覆盖机制]] 5.2、9.2、9.3。
 
 启用步骤(**已做,2026-11-10 10:56**):
 1. 文件和软链:`ls -la ~/.claude-mem/modes/code--lean.json`(`~/.claude-mem/modes` 已软链到 `~/.config/opencode/claude-mem/modes/`);
 2. `CLAUDE_MEM_MODE` 已从 `code--zh` 改成 `code--zh--lean`(`~/.claude-mem/settings.json` 是软链,指向配置仓库里的同一个文件,不存在"读哪份"的问题;`settings.example.jsonc` 已同步);
-3. `npx claude-mem restart` 已重启 worker(日志有一条 handoff 超时警告、退回命令行拉起,新 worker 正常);
-4. 验证:开场注入第一行已是 `Mode: Code Development (Chinese, lean) (code--zh--lean)`,日志有 `Mode loaded: code--zh--lean`。**效果验证(数新增过程记忆条数)还没做**,启用前基线见 [[claude-mem-mode文件与覆盖机制]] 9.1。
+3. `npx claude-mem restart` 已重启 worker(日志有一条 handoff 超时警告、退回命令行拉起,新 worker 正常);11:13 第二版规则写入后又重启了一次;
+4. 验证:开场注入第一行已是 `Mode: Code Development (Chinese, lean) (code--zh--lean)`,日志有 `Mode loaded: code--zh--lean`。第一版效果已测(0/4,见 mode 文章 9.2),**第二版效果还没测**(见 9.3),启用前基线见 9.1。
 
 已读源码确认的(`loadModeFile`/`loadMode`/`validateMode`):
 - `parseInheritance("code--zh--lean")` 得到父 `code`、覆盖 `code--zh` 和 `code--lean`,所以要建的文件是 `code--lean.json`;
@@ -418,7 +422,7 @@ OpenCode 插件不发 `agentId`/`agentType`,`SKIP_SUBAGENT_OBSERVATIONS` 也压�
 
 仍然没验证的:
 - 实际启动 worker 后合并是否如上述(只读了代码,没跑);
-- LLM 看到新增的第 6 条后,真的会跳过整理回执,还是照记。
+- 第二版第 6 条(按调用类型一刀切)后,observer 是否会跳过融合记忆写入后的转述:**没测**。第一版是照记(0/4)。
 
 ### 怎么验证
 

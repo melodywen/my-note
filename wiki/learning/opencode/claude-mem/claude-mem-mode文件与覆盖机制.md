@@ -268,7 +268,7 @@ footer                 收尾约束
 {
   "name": "Code Development (Chinese, lean)",
   "prompts": {
-    "skip_guidance": "何时跳过\n------------\n跳过例行操作:\n- 本会话中你已经记录过的事实、决策或修复状态,即使换了说法也不要再记。尤其是反复确认同一结果的循环(评审轮次、重试、轮询):只在第一次确认时记一次,之后对同一事实的再次确认一律跳过。\n- 空的状态检查\n- 没有报错的软件包安装\n- 没有后续发现的简单文件列表\n- 查无结果的文件相关调研\n- 只说明\"做了某一步\"或\"结果符合预期\"的操作回执,例如:写入了一条记忆、归档或删除了旧记忆、\"记忆 #N 已写入\"、\"已归档到文件 X\"、复查确认删除生效、提交或推送完成。只有出乎意料的结果,或能说明决策、根因、踩坑的内容才记。\n\n如果要跳过,请严格只回复 <skip_summary reason=\"noise\" />(reason 属性里写一句简短理由),不要回复其他任何内容。不要回复空内容,也不要用文字解释为什么跳过。"
+    "skip_guidance": "何时跳过\n------------\n跳过例行操作:\n- 本会话中你已经记录过的事实、决策或修复状态,即使换了说法也不要再记。尤其是反复确认同一结果的循环(评审轮次、重试、轮询):只在第一次确认时记一次,之后对同一事实的再次确认一律跳过。\n- 空的状态检查\n- 没有报错的软件包安装\n- 没有后续发现的简单文件列表\n- 查无结果的文件相关调研\n- 只说明\"做了某一步\"或\"结果符合预期\"的操作回执,例如:写入了一条记忆、归档或删除了旧记忆、\"记忆 #N 已写入\"、\"已归档到文件 X\"、复查确认删除生效、提交或推送完成。这类回执只有在结果出乎意料,或其中包含决策、根因、踩坑时才记。\n\n如果要跳过,请严格只回复 <skip_summary reason=\"noise\" />(reason 属性里写一句简短理由),不要回复其他任何内容。不要回复空内容,也不要用文字解释为什么跳过。"
   }
 }
 ```
@@ -280,7 +280,7 @@ footer                 收尾约束
 
 **第 6 条的设计:** 写成"判断标准"而不是"清单"。
 - 判断标准:这条记录**只说明做了某一步,或结果符合预期**吗?是就跳过;
-- 保留口子:**出乎意料的结果**,或能说明**决策、根因、踩坑**的内容仍然要记。比如"复查发现删除没生效"是坑,会被记下来;"复查确认删除生效"只是回执,会被跳过;
+- 保留口子:**这类回执**如果结果出乎意料,或包含**决策、根因、踩坑**,仍然要记。(措辞曾写成"只有出乎意料的结果……才记",没限定"这类回执",可能被 observer 读成"所有观察都只有这几种才记"而过度跳过,所以改成现在的写法,把范围锁在第 6 条自己身上。)比如"复查发现删除没生效"是坑,会被记下来;"复查确认删除生效"只是回执,会被跳过;
 - 覆盖面比"只管记忆整理"更宽:提交、推送完成也算回执。代价是误伤风险更高,上线后要观察几天,看有没有真正有价值的修复被跳过。
 
 **英文对照**(给以后对照用,**不放进提示词**,放进去每次调用都多读一遍):
@@ -311,7 +311,7 @@ Skip routine operations:
 - Package installations with no errors
 - Simple file listings with no follow-on finding
 - File related research that comes back empty or not found
-- Operation receipts that only state a step was performed, or that its result matched expectations (e.g. a memory was written, old memories were archived or deleted, "memory #N written", "archived to file X", re-checking that a deletion took effect, a commit or push completed). Record only results that were unexpected, or that explain a decision, root cause, or gotcha.
+- Operation receipts that only state a step was performed, or that its result matched expectations (e.g. a memory was written, old memories were archived or deleted, "memory #N written", "archived to file X", re-checking that a deletion took effect, a commit or push completed). Record such a receipt only if its result was unexpected, or if it contains a decision, root cause, or gotcha.
 
 If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason in the attribute) and nothing else. Never reply with an empty response or explain the skip in prose.
 ```

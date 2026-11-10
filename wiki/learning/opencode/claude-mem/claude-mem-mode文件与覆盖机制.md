@@ -491,7 +491,7 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 **没打补丁的原因:** 插件文件与官方 `dist/opencode-plugin/index.js` 逐字节相同,是安装时拷过来的压缩产物,没进配置仓库的 git,升级或重装会被覆盖且无提示。
 
-**现状:** 规则已配上,对 OpenCode 不生效,留着无害,上游若让 worker 或插件认小写 `bash` 就会自动生效。下一步是向上游提 issue。
+**现状:** 规则已配上,对 OpenCode 不生效,留着无害,上游若让 worker 或插件认小写 `bash` 就会自动生效。已向上游提 issue:https://github.com/thedotmack/claude-mem/issues/5666(同类的 PowerShell 问题是 #4745,已由 #4762 修复)。
 
 ## 10. 没验证的清单
 

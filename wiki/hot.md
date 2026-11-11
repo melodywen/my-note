@@ -1,12 +1,14 @@
 ---
 type: meta
 title: "Hot Cache"
-updated: 2026-11-08
+updated: 2026-11-11
 ---
 
 # 最近上下文 (Hot Cache)
 
 ## 最近更新
+
+2026-11-11。claude-mem 升到 v15.16.0,新增 [[claude-mem-升级与版本记录]],九篇旧文已按新结论订正:`SKIP_BASH_PATTERNS` 自 v15.16.0 起对 OpenCode 生效(#5666 已修,旧条"在 OpenCode 下无效"作废),但拦不住 cd 后相对路径与读旧记忆的 curl;`SKIP_TOOLS` 整名精确匹配、不分大小写、无通配符,已加三个 claude_mem_* 检索工具;`SKIP_SUBAGENT_OBSERVATIONS` 对 OpenCode 无效(插件不带 agentId/agentType);本地检索向量优先、无 RRF(仅服务器 Postgres 模式有),中文走 LIKE 子串;opencode 配置统一为 `opencode.json`。向量方案(Ollama + bge-m3)已于 2026-11-08 上线。
 
 2026-11-08。新增 [[claude-mem-本地多语言向量方案]]:`EMBEDDING_MODEL` 在本机路径无效且不报错;`CHROMA_EMBEDDING_FUNCTION` 填白名单外的值重启才报错;可借 `openai` 函数加 `~/.chroma_env`(chroma-mcp 自带读取)指向本机 Ollama 的 bge-m3,在 /tmp 隔离副本里整库重建成功(1024 维),6 条中文查询命中 5/6 对 1/6,但标准答案偏窄、样本小,真实环境尚未上线。
 2026-11-08。claude-mem 第 4、5 轮调教完成:第 4 轮(注入)实测后一个键都不改,默认注入约 5000 字符;第 5 轮把 `SEARCH_RECENCY_DAYS` 改为 0(构造数据实测:窗口外的精确命中在"近期有不相干向量命中"时会被漏掉)。中文召回无配置层解法。claude-mem 无冲突推翻和 dream 整理能力,只有 `DELETE /api/observation/:id` 与 `save_memory`。

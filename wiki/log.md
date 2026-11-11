@@ -1,7 +1,7 @@
 ---
 type: meta
 title: "Log"
-updated: 2026-11-08
+updated: 2026-11-11
 ---
 
 # 操作日志 (Log)
@@ -9,6 +9,12 @@ updated: 2026-11-08
 仅追加。新条目放在最上方。永不修改历史条目。
 
 ---
+
+## 2026-11-11 — claude-mem 升级到 v15.16.0 与文档整体订正
+
+- 升级 15.12.1 → v15.16.0;核实 #5666 已修(SKIP_BASH_PATTERNS 对 OpenCode 生效)、SKIP_TOOLS 匹配规则、subagent 开关对 OpenCode 无效、REDACT 默认关闭、本地检索与中文 LIKE 机制
+- opencode 配置统一为 opencode.json
+- 新增:[[claude-mem-升级与版本记录]];订正:claude-mem 目录下 9 篇既有文档(安装部署、从0到1总览、调教清单、mode文件与覆盖机制、存储与读取机制、本地多语言向量方案、跨端共享、配置详解);更新 hot、index
 
 ## 2026-11-08 — claude-mem 本地多语言向量方案(隔离实测)
 

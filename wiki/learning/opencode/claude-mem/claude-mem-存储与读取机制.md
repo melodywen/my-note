@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "claude-mem 存储与读取机制"
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-11
 tags:
   - learning
   - opencode
@@ -24,7 +24,7 @@ related:
 
 > 一句话:**一条记忆先完整存进一个 SQLite 数据库(这是"真相"),再拆成几段文字复制一份到向量库 Chroma 里(这是"按意思找"的索引);搜索时先按意思找,按意思找不到的类别再用关键词补查。中文两层都偏弱:按意思那层默认模型是英文的,关键词那层不会切汉字,只能退化成子串匹配。**
 >
-> 本篇读的是 `/tmp/claude-mem` 源码(main 分支,`package.json` 版本 15.12.0,commit `3ab6e1a21`)。已在本机装机并跑过 worker,中文召回有实测(见 6.3 节),其余仍以读源码为准。凡是标"未证实"或"推断"的,不要当结论用。
+> 本篇读的是 `/tmp/claude-mem` 源码(main 分支,`package.json` 版本 15.12.0,commit `3ab6e1a21`);本机现已升到 v15.16.0,检索机制的订正(5.6 节、6.1 的 LIKE 切分规则)来自 v15.12.0 与 v15.15.1 源码,v15.16.0 的 release 说明里搜索只有边界修复(Unicode/组合字符保留、project key 与路径保留、timeline 前缀),未读其代码 diff。已在本机装机并跑过 worker,中文召回有实测(见 6.3 节),其余仍以读源码为准。凡是标"未证实"或"推断"的,不要当结论用。
 
 ---
 
@@ -105,7 +105,7 @@ Chroma 开着(默认开)?  --否-->  只走 SQLite:
 | fact | `obs_<id>_fact_<序号>` | `facts` 里的每一条事实,各一个文档 | 每条事实一个(约 710 行) |
 | title | `obs_<id>_title` | 标题 + 副标题合并 | 仅当上面三类一个都没有时(约 722 行) |
 
-这就是为什么同一条观察可能在 Chroma 里命中多次;查询结果会按 (文档类型, SQLite id) 去重(ChromaSync.ts `deduplicateQueryResults`,约 2241 行)。
+这就是为什么同一条观察可能在 Chroma 里命中多次;查询结果会按 (文档类型, SQLite id) 去重(ChromaSync.ts `deduplicateQueryResults`,约 2241 行);同一条观察多段命中时**保留首次出现(即最相似)的一段**。
 
 每个文档都带同一组元数据 `metadata`(约 667-692 行):
 
@@ -187,7 +187,7 @@ FTS5 索引 `observations_fts` 是"外部内容表"(`content='observations'`),�
 | FTS5 一个都没命中(例如汉字和英文粘在一起:`payload优先使用LLM`) | 再试子串匹配 | 约 799-805 行 |
 | 子串也没命中,且查询有 3 个以上词 | 放宽成"任一词命中"(OR),按 bm25 排 | 约 806-807 行;`buildFTSAnyTermQuery` 约 507 行,3 词门槛约 462 行 |
 
-为什么要降级:FTS5 的 `unicode61` 分词器靠空白和标点切词,汉字之间没有这两样,一整串汉字被当成一个词,查其中一部分查不到。源码里有实测对照:`项目` 在 `修改了项目配置` 里命中 0 行(SessionSearch.ts 约 396-415 行注释,#3801)。
+为什么要降级:FTS5 的 `unicode61` 分词器靠空白和标点切词,汉字之间没有这两样,一整串汉字被当成一个词,查其中一部分查不到。源码里有实测对照:`项目` 在 `修改了项目配置` 里命中 0 行(SessionSearch.ts 约 396-415 行注释,#3801)。本机库实测(只读,my-note 库):`项目` 用 LIKE 子串命中 273 行,用 FTS MATCH 命中 51 行——FTS 并非 0,而是远少于 LIKE,只命中"项目"恰好被标点/空格隔开、自成一个 token 的行(fts5vocab 里的 token 形如 `项目为`、`任务项目为`、`该项目观察超过`)。再如 `记忆融合`:LIKE 8 行、FTS 整段 0;`claude`:LIKE 771;`FTS5`:LIKE 37。
 
 LIKE 子串匹配怎么工作(`buildSubstringClause`,约 444-459 行):
 
@@ -211,6 +211,22 @@ Chroma 用一次"全类型取前 N"的查询,所以某一类可能被别的类�
 | 部分类别空 | 只给空的类别用 SQLite 补,其余保留 Chroma 结果,返回策略标记为 `hybrid` | 约 189-225 行 |
 | 都不空 | 原样返回 | 约 180-182 行 |
 
+### 5.6 补充:排序、阈值与融合(v15.15.1 源码核对)
+
+以下是对 5.1-5.5 的补充,来自读 v15.15.1 源码(`SearchManager.search` + `SearchOrchestrator`),本机 v15.16.0 的 release 说明里没有这方面的改动:
+
+| 点 | 结论 |
+|---|---|
+| Chroma 返回什么 | `ChromaSync.queryChroma` 只取 ids/metadatas/distances;先超采样,再在客户端按 project/平台/doc_type 过滤;`distances` 之后不再用于任何阈值或加权 |
+| 有没有距离阈值 | **向量路无距离阈值/截断**(ChromaSync、SearchManager、search 策略里搜 maxDistance/threshold/minScore/similarity 均无),永远返回 top-N,所以几乎不会返回空 |
+| 排序(orderBy) | `hydrateCandidates` 回填 SQLite 行:`orderBy=relevance` 时保持向量顺序,非 relevance 时按日期重排。`SearchManager.search` 不传 orderBy 时默认 relevance(向量顺序);策略类(如 `ChromaSearchStrategy`)直接调用的默认是 date_desc。MCP search 工具只暴露 date_desc / date_asc 两种 |
+| 补位怎么拼 | `supplementEmptyCategories` 的 SQLite 补位结果去重后**追加在向量结果后面**,不是按分数交错;向量预算耗尽(`semanticBudgetReached`)且某类不足 limit 时也会补位 |
+| date 排序时的并集 | orderBy 为 date_desc/date_asc 时,`mergeKeywordMatchesByDate`(SearchManager.ts:422,#4135)把每类的 FTS5 关键词命中与向量结果取并集、去重、按日期排序、截断到 limit——这是本地模式唯一真正的"两路并联",但仍不打分 |
+| timeline 查询 | 优先走 Chroma,向量结果为空才回落 SQLite 关键词检索,且只取 limit:1 |
+| RRF / BM25 / 重排 | **本地模式没有**。RRF 只在服务器 Postgres 运行时(`src/storage/postgres/observations.ts` 的 `searchHybrid`):score = sum(1/(60+rank)),RRF_K=60,每路候选至少 100;向量路取 HNSW 最近 400 个部分、每条观察取最近一部分排名;关键词路有 pg_textsearch 用 bm25,否则 ts_rank;同分按 updated_at DESC;只比较同嵌入模型的向量。本机不用 |
+
+结论:因为向量路无阈值、几乎不空,5.4 的 FTS/LIKE 层和 5.5 的补位在本地模式下**很少被触发**;触发时,中文命中是"字面上含这个串但无相关度排序"。一条不相干的向量命中就足以让该类别非空,从而屏蔽 LIKE 补位(此前实测过)。需要真正的双路融合,只有服务器模式。
+
 ---
 
 ## 六、中文为什么搜不准、有哪些补救办法
@@ -224,6 +240,17 @@ Chroma 用一次"全类型取前 N"的查询,所以某一类可能被别的类�
 | 关键词层不切汉字 | FTS5 `unicode61` 把连续汉字当一个词,所以含汉字查询干脆不走 FTS5 | 源码:SessionSearch.ts 约 396-416、768 行,含源码内的实测数字 |
 | 降级后不排序且要求连续 | 子串匹配只看"含不含",按时间倒序,长句要原样连续出现 | 源码:SessionSearch.ts 约 444-459、674-677 行 |
 | "汉字查询被用户提问挤掉观察" | 源码自己承认存在,并用空类别补查缓解 | 源码注释:SearchOrchestrator.ts 约 157-158 行 |
+
+**LIKE 切分规则(v15.15.1 源码核对)**:含汉字/假名/谚文/泰文等(`UNSEGMENTED_SCRIPT`)的查询完全绕过 FTS5,走 LIKE 子串。查询按"连续不分词文字段 / 其他连续非空白段"切分(`substringTerms`,去重,最多 500 段);每段生成 `LIKE %段%`,在六列上 OR;段间 AND(#4148:中英混排按段匹配,不要求相邻)。没有单字匹配、n-gram、jieba、trigram。
+
+| 查询 | 切成 | 说明 |
+|---|---|---|
+| `claude 队列` | `claude`、`队列` | 两段都要出现 |
+| `payload优先使用LLM` | `payload`、`优先使用`、`LLM` | 中英粘连也按段拆 |
+| `中文检索为什么这么差` | 整句一段 | 必须在某一列原样连续出现 |
+| `记忆融合` | 一段 | 本机实测 LIKE 8 行、FTS 整段 0 |
+
+**汉字查询的 relevance 退化**:汉字查询走 LIKE 时 `hasFTS=false`,relevance 排序退化为 `created_at_epoch DESC`(时间倒序),没有相关度。只有英文查询才走 FTS5 `MATCH` 并按 rank(bm25)排序;英文 FTS 零命中降级子串;子串也零命中且 ≥3 词时放宽为 OR(按词频选稀有词,最多 40-60 词),但对无空格的中文长句不起作用。
 
 ### 6.2 补救办法
 
@@ -252,7 +279,7 @@ Chroma 用一次"全类型取前 N"的查询,所以某一类可能被别的类�
 
 > 订正:本节是**换模型之前**(默认 MiniLM)的 12 条小样本。2026-11-08 已换成本地 bge-m3,换后的 30 条手工标准答案验收见 [[claude-mem-本地多语言向量方案]] 5.3 节:中问中勉强可用,英问中没变好。
 
-环境:claude-mem v15.12.0,OpenCode 插件,worker 端口 37701,本机 Chroma(local 模式),默认嵌入函数 `default`(all-MiniLM-L6-v2,偏英文)。测试时库里有 29 条观察,其中 21 条标题含中文;向量库共 275 个文档,提问原文占多数。
+环境:claude-mem v15.12.0(测试当时),OpenCode 插件,worker 端口 37701,本机 Chroma(local 模式),默认嵌入函数 `default`(all-MiniLM-L6-v2,偏英文)。测试时库里有 29 条观察,其中 21 条标题含中文;向量库共 275 个文档,提问原文占多数。
 
 测法:把 `~/.claude-mem/chroma` 复制一份,用 `uvx` 起 `chromadb==1.5.9` 直接做纯向量查询,看"标准答案那条观察"在 29 条观察里排第几(越小越好)。共 12 条查询:
 
@@ -284,7 +311,7 @@ Chroma 用一次"全类型取前 N"的查询,所以某一类可能被别的类�
 
 ## 七、你本机默认配置下实际会走哪条路径
 
-前提:路径表按源码默认值推出来;本机现已装好并跑过(claude-mem v15.12.0,OpenCode 插件,worker 端口 37701,Chroma 为 local 模式,默认嵌入函数 `default`),向量层的召回名次有实测(见 6.3),其余步骤仍是读源码的推断。如果你的数据目录被环境变量改过,路径会不同(我没查 `DATA_DIR` 的覆盖逻辑,未证实)。
+前提:路径表按源码默认值推出来;本机现已装好并跑过(测试时为 claude-mem v15.12.0,现为 v15.16.0,OpenCode 插件,worker 端口 37701,Chroma 为 local 模式,默认嵌入函数 `default`),向量层的召回名次有实测(见 6.3),其余步骤仍是读源码的推断。如果你的数据目录被环境变量改过,路径会不同(我没查 `DATA_DIR` 的覆盖逻辑,未证实)。
 
 | 默认值 | 取值 | 位置 |
 |---|---|---|
@@ -303,10 +330,10 @@ Chroma 用一次"全类型取前 N"的查询,所以某一类可能被别的类�
 | 1 | 请求进 SearchManager / Orchestrator,`CHROMA_ENABLED` 为真,走 Chroma | |
 | 2 | Chroma 用默认英文模型把中文查询转向量,取候选 | 召回质量偏弱:中文问中文不稳定,中文问英文记忆基本垫底(6.3 实测,样本小) |
 | 3 | 丢掉 90 天前的命中 | 老记忆被过滤 |
-| 4 | 某类为空(中文查询时很常见,推断)则用 SQLite 补查,不限天数 | 走多列 LIKE 子串匹配,能命中原样出现的关键词 |
+| 4 | 仅当某类为空才用 SQLite 补查,不限天数。向量层无距离阈值、几乎总不空(v15.15.1 源码),所以这一步**实际很少走** | 触发时走多列 LIKE 子串匹配,能命中原样出现的关键词,但无相关度排序 |
 | 5 | 若 Chroma 子进程起不来,`SearchManager.search` 降级成 FTS5/子串关键词搜索 | 同第 4 步 |
 
-也就是说,**本机上中文能不能搜到,多半靠第 4 步的子串补查,而不是向量**。这是推断:依据是源码路径;6.3 只测了纯向量名次,没有测第 4 步补查在真实搜索里是否触发(未证实)。另外 `/api/search` 不按查询过滤,乱码查询也返回结果,所以不能用"有结果"判断命不命中。
+也就是说,**本机上中文搜索的结果主要由向量层决定;LIKE 子串补查只在整类为空时才触发,实际很少走**(此前"多半靠第 4 步子串补查"的推断已订正:向量路无阈值、几乎不空,且一条不相干的向量命中就足以屏蔽补位)。依据是 v15.15.1 源码;6.3 只测了纯向量名次。另外 `/api/search` 不按查询过滤,乱码查询也返回结果,所以不能用"有结果"判断命不命中。
 
 ---
 
@@ -328,6 +355,6 @@ Chroma 用一次"全类型取前 N"的查询,所以某一类可能被别的类�
 | `SQLiteSearchStrategy`、`HybridSearchStrategy` 的实现 | 没读;我假定 SQLite 策略最终调用 `SessionSearch`(推断) |
 | MCP 搜索工具实际走 `SearchManager.search` 还是 `SearchOrchestrator.search` | 没追 |
 | `SessionStore.storeObservations` 内部的 INSERT 语句与去重、合并逻辑 | 只读了签名;表结构来自建表和 ALTER 语句的拼合,可能漏列 |
-| 服务器模式(Postgres + pgvector)的完整检索流程 | 只读到向量服务和 schema 的几处注释,没读 `storage/postgres` 的查询细节 |
+| 服务器模式(Postgres + pgvector)的完整检索流程 | 只读到向量服务和 schema 的几处注释,以及 `searchHybrid` 的 RRF 参数(见 5.6);其余查询细节没读 |
 | `DATA_DIR` 的环境变量覆盖逻辑 | 没读 |
 | 向量文档数量对 Chroma 候选预算(100→1600)的实际影响 | 没测 |

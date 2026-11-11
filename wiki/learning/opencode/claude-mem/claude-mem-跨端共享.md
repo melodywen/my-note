@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "claude-mem 跨端共享:OpenCode 和 DSH 怎么共用一份记忆"
 created: 2026-11-08
-updated: 2026-11-09
+updated: 2026-11-11
 tags:
   - learning
   - opencode
@@ -23,7 +23,7 @@ related:
 
 > 一句话:**两个端各自接一个小插件,把事件发给同一个本机 worker 进程,存进同一个数据库。能不能互相看到,取决于三件事:项目名算得一不一致、来源过滤开没开、两端是不是都真的接上了。**
 >
-> 前半部分依据读源码(claude-mem 约 v15.12.0);**2026-11-09 已在本机实测 DSH 这一端,结果见第 8 节**。标"未证实"的是没读到或没验证的部分。
+> 前半部分依据读源码(claude-mem 约 v15.12.0;本机现已升到 v15.16.0);**2026-11-09 已在本机实测 DSH 这一端,结果见第 8 节**。标"未证实"的是没读到或没验证的部分。
 
 ---
 
@@ -194,7 +194,7 @@ claude-mem 有官方的 DSH 集成,不是社区拼凑。
 - `npx claude-mem install --ide dsh --dsh-profile desktop` 内部会执行 `dsh plugin --profile desktop add …`。
 - `dsh` 命令行把 `desktop` 这个名字写死拒绝:`@deepseek-ai/dsh/lib/bin.js` 第 36 行 `rejectElectronProfile`,报错 `profile "desktop" is managed exclusively by the Electron application`。**按名字判断,与桌面应用是否在运行无关。**
 - 所以安装器会把 DSH 判为失败;只选了 DSH 一项时整体 `all-ides-failed` 中止。
-- **副作用:这个失败的安装器仍然先把 claude-mem 本体升级了(15.12.0 到 15.12.1)并停掉了 worker**,要手动 `worker-service.cjs start` 拉起来。别对 `desktop` 反复跑它。
+- **副作用:这个失败的安装器仍然先把 claude-mem 本体升级了(15.12.0 到 15.12.1;本机现为 v15.16.0)并停掉了 worker**,要手动 `worker-service.cjs start` 拉起来。别对 `desktop` 反复跑它。
 - 能装的只有其他名字的 profile(`web`、`headless` 等)。DSH 官方有没有给桌面版装插件的正规入口,**没查**。
 
 ### 8.2 手动做法(等价于安装器干的两件事)
@@ -205,7 +205,7 @@ claude-mem 有官方的 DSH 集成,不是社区拼凑。
 | 写:让 worker 采集 DSH 会话 | 新建 `~/.claude-mem/transcript-watch.json`:监听名 `dsh`、路径 `~/.dsh/sessions`、`startAtEnd: true`、内嵌 `transcript-schema.json`;重启 worker | 本机的真文件放配置仓库 `~/.config/opencode/claude-mem/transcript-watch.json`,软链到 `~/.claude-mem/`。文件里没有密钥 |
 | 放开来源过滤 | `settings.json` 设 `CLAUDE_MEM_SESSION_START_INCLUDE_ALL_SOURCES="true"` | OpenCode 插件每次实时读,不用重启 |
 
-- `~/.claude/plugins/...` 这个目录是 claude-mem 本体的统一安装位置(源码 `shared/paths.ts:53`),不管装哪个客户端都会建。OpenCode 的 `claude-mem.js` 是单独打包放在 `~/.config/opencode/plugins/` 的,升级本体后要重跑 `npx claude-mem install --ide opencode` 才会更新。
+- `~/.claude/plugins/...` 这个目录是 claude-mem 本体的统一安装位置(源码 `shared/paths.ts:53`),不管装哪个客户端都会建。OpenCode 的 `claude-mem.js` 是单独打包放在 `~/.config/opencode/plugins/` 的,升级本体后要重跑 `npx claude-mem@latest install --ide opencode` 才会更新,升级后需重启 worker。
 - 想让 DSH 插件随 claude-mem 自动更新,可以把 `link:` 改成指向 `~/.claude/plugins/marketplaces/thedotmack/dsh` 的绝对路径。代价:换机器会失效,且升级后要重启 DSH。**没采用,仍是复制品。**
 
 ### 8.3 实测结果

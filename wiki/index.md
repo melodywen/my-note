@@ -73,6 +73,8 @@ updated: 2026-08-14
 10. [[claude-mem-网页后台使用指南]](37701 端口网页后台怎么用:顶栏、时间线、设置弹窗、日志、30 天试用按钮的真相)
 11. [[claude-mem-本地多语言向量方案]](Ollama + bge-m3 给 claude-mem 换上中文向量:原理、隔离实测、落地步骤与风险)
 12. [[claude-mem-mode文件与覆盖机制]](`CLAUDE_MEM_MODE` 配方怎么拆、叠加文件怎么合并、JSON 里能写哪些键、怎么新建覆盖文件改 observer 的记录/跳过规则)
+13. [[claude-mem-从0到1总览]](从选型到上线的全流程总览)
+14. [[claude-mem-升级与版本记录]](本机现为 v15.16.0:升级命令与 all-ides-failed 绕过、opencode.json 统一、各版本对旧结论的影响)
 
 **🗂️ Obsidian（工具）**
 1. [[Obsidian 命令与技能完全指南]] — Obsidian 命令体系 + claude-obsidian 14 个 AI 技能

@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "claude-mem 安装部署"
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-11
 tags:
   - learning
   - opencode
@@ -21,9 +21,9 @@ related:
 
 # claude-mem 安装部署
 
-> 一句话:**安装 claude-mem 就是在本机起一个常驻后台的小服务(worker),再给 OpenCode 和 DSH 各装一个适配插件;最大的两个坑是"选错观察者提供方会被引到云端登录"和"本机只有 opencode.jsonc,安装器却只认 opencode.json"。**
+> 一句话:**安装 claude-mem 就是在本机起一个常驻后台的小服务(worker),再给 OpenCode 和 DSH 各装一个适配插件;最大的坑是"选错观察者提供方会被引到云端登录";另一个是"安装器写死只认 opencode.json、不检查 opencode.jsonc",但实测 OpenCode V2 两个文件都会读取并合并、并存不冲突,本机已统一为 opencode.json。**
 >
-> 基于 claude-mem main 分支(约 v15.12.0)源码;OpenCode 端已于 2026-11-08 装机并实测,实测记录见 3.7 节,DSH 端已于 2026-11-09 手动接入并实测(官方安装器对 `desktop` profile 必败,见 [[claude-mem-跨端共享]] 第 8 节)。凡标"未证实/未验证/推断/没读到"的地方,都不是确定结论。
+> 基于 claude-mem main 分支(约 v15.12.0)源码(装机当时为 15.12.0/15.12.1;**本机现为 v15.16.0,2026-11-11 升级**,升级步骤见 5.2 节);OpenCode 端已于 2026-11-08 装机并实测,实测记录见 3.7 节,DSH 端已于 2026-11-09 手动接入并实测(官方安装器对 `desktop` profile 必败,见 [[claude-mem-跨端共享]] 第 8 节)。凡标"未证实/未验证/推断/没读到"的地方,都不是确定结论。
 
 ---
 
@@ -62,7 +62,7 @@ related:
 
 | 项 | 现状 |
 |---|---|
-| `~/.config/opencode/` | 只有 `opencode.jsonc`,**没有** `opencode.json`;另有 `opencode-mem.jsonc`、`oh-my-opencode-slim.json`、`plugins/` 目录 |
+| `~/.config/opencode/` | 现以 `opencode.json` 为唯一主配置(装机当时只有 `opencode.jsonc`、没有 `opencode.json`;该文件无注释,已合并进 `opencode.json` 并删除);另有 `opencode-mem.jsonc`、`oh-my-opencode-slim.json`、`plugins/` 目录 |
 | 现用记忆插件 | opencode-mem |
 | `~/.dsh/` | 存在,`profiles` 目录在 |
 | `~/.claude-mem` | 装机前不存在(这是装机前的快照,现已装好) |
@@ -91,7 +91,7 @@ which dsh        # 装 DSH 侧才需要,能找到路径即可
 安装器会改 OpenCode 和 DSH 的配置,先备份:
 
 ```bash
-cp ~/.config/opencode/opencode.jsonc ~/.config/opencode/opencode.jsonc.bak
+cp ~/.config/opencode/opencode.json ~/.config/opencode/opencode.json.bak
 cp -r ~/.config/opencode/plugins ~/.config/opencode/plugins.bak
 cp -r ~/.dsh/profiles ~/.dsh/profiles.bak
 ls ~/.config/opencode/     # 记下当前文件清单,装完对比
@@ -99,7 +99,7 @@ ls ~/.config/opencode/     # 记下当前文件清单,装完对比
 
 ### 2.3 暂停现用的 opencode-mem
 
-claude-mem 和 opencode-mem 并存会**重复注入**上下文。测试期间先停掉 opencode-mem:在 `opencode.jsonc` 里把 opencode-mem 的插件项临时注释掉(具体写法以你文件里的实际条目为准,本笔记没有读你的文件内容)。`opencode-mem.jsonc` 本身不用删,留着方便回退。
+claude-mem 和 opencode-mem 并存会**重复注入**上下文。测试期间先停掉 opencode-mem:在 `opencode.json` 里把 opencode-mem 的插件项临时移出(具体写法以你文件里的实际条目为准,本笔记没有读你的文件内容)。`opencode-mem.jsonc` 本身不用删,留着方便回退。
 
 ### 2.4 选观察者提供方
 
@@ -139,9 +139,9 @@ claude-mem 和 opencode-mem 并存会**重复注入**上下文。测试期间先
 
 顺序:**先只装 OpenCode → 验证 → 再装 DSH**。每步确认没问题再往下。
 
-### 3.0 风险项:opencode.jsonc 与 opencode.json
+### 3.0 配置文件:opencode.json 与 opencode.jsonc(已验证,不冲突)
 
-> **醒目风险**:源码里 OpenCode 安装器只读写 `~/.config/opencode/opencode.json`,**没有处理 `opencode.jsonc`**。本机只有 `opencode.jsonc`。所以装完可能**另起一个 `opencode.json`**。它和你现有的 `opencode.jsonc` 并存会不会冲突,**未验证**(取决于 OpenCode 自身的加载行为)。
+> **结论(实测)**:OpenCode 安装器只读写 `~/.config/opencode/opencode.json`(写死路径,`OpenCodeInstaller.ts:109`),不检查 `opencode.jsonc`,文件不存在就新建。装机当时本机只有 `opencode.jsonc`,所以装完另起了一个 `opencode.json`。OpenCode V2(本机 v2.2.6)用 `opencode debug config` 实测:`opencode.json` 与 `opencode.jsonc` **都会读取并合并**,并存不冲突,claude-mem 只加载一份。本机已决定统一为 `~/.config/opencode/opencode.json`(原 `opencode.jsonc` 无注释,已合并并删除),**以后新增配置都改 `opencode.json`**。
 
 稳妥步骤:
 
@@ -150,14 +150,13 @@ claude-mem 和 opencode-mem 并存会**重复注入**上下文。测试期间先
 
 ```bash
 ls -la ~/.config/opencode/
-cat ~/.config/opencode/opencode.json     # 如果新生成了,看里面写了什么
+cat ~/.config/opencode/opencode.json     # 看安装器写了什么
+opencode debug config                    # 看合并后的最终配置
 ```
 
-3. 若**新生成了 `opencode.json`**:
-   - 先别急着删。重启 OpenCode,看现有配置(模型、其他插件)是否还正常生效。
-   - 若现有配置失效或行为异常:把 `opencode.json` 里 claude-mem 相关的几项(plugin/plugins 数组里的插件路径、MCP 配置)手工合并到 `opencode.jsonc`,然后把 `opencode.json` 移走(如 `mv opencode.json opencode.json.new`),再重启验证。
-   - 若合并后想回退:用 `.bak` 文件恢复。
-4. 手工合并的具体字段名只按 `opencode.json` 里实际生成的内容照抄,不要自己编。
+3. 若本机同时有 `opencode.json` 和 `opencode.jsonc`:两个并存不会冲突,可以不动;想统一的话,以 `opencode.json` 为准,先备份,把 `.jsonc` 的内容合并进去再移走 `.jsonc`(本机就是这么做的)。
+4. V2 的 `debug config` 里 MCP 显示为 `mcp.servers.<名字>`(V1 写法 `mcp.<名字>` 仍兼容)。合并时具体字段名只按安装器在 `opencode.json` 里实际生成的内容照抄,不要自己编。
+5. 若配置异常:用 `.bak` 恢复。
 
 ### 3.1 第一步:只装 OpenCode
 
@@ -275,7 +274,7 @@ OPENAI_COMPAT_API_KEY=<你的网关 key>
 |---|---|---|
 | 执行 `npx -y claude-mem install --ide opencode --provider claude --no-auto-start`(v15.12.0),腾讯镜像 `https://mirrors.tencent.com/npm/` 对部分包返回 403 报错 | 镜像对部分包拒绝访问 | 不影响安装结果,可忽略 |
 | 安装后 worker 在 37701 健康;`/api/projects` 显示来源 `opencode`、项目 `my-note`,提问原文写入 `user_prompts` 表 | 安装器构建的 OpenCode 插件 `plugins/claude-mem.js`(约 500KB)被 OpenCode 自动加载 | 无需处理 |
-| 安装器会生成 `opencode.json`,而本机用 `opencode.jsonc` | 安装器只认 `opencode.json` | 把 claude-mem 的 MCP 并入 `~/.config/opencode/opencode.jsonc` 的 `mcp.servers.claude-mem`,把 `opencode.json` 移走备份;`opencode mcp list` 显示 9 个 MCP 全部 connected |
+| 安装器会生成 `opencode.json`,而本机当时用 `opencode.jsonc` | 安装器写死 `opencode.json`,不检查 `.jsonc` | 11-08 当时曾把 claude-mem 的 MCP 并入 `opencode.jsonc` 并移走 `opencode.json`,`opencode mcp list` 显示 9 个 MCP 全部 connected。后来用 `opencode debug config` 验证两文件并存不冲突,本机改为统一 `opencode.json`(`.jsonc` 已并入并删除) |
 | 曾尝试把 `plugins/claude-mem.js` 入配置仓库,被工蜂 bugbot 拦下,报压缩文件里重试逻辑判断写反 | 该文件是第三方产物 | 不入库,已写入配置仓库 `.gitignore` |
 | 观察者不工作:观察 0 条,队列积压 11 | 找不到 claude 可执行文件 | 改用 `openai-compatible`(见 3.6) |
 | 直连 codebuddy 行不通(推断,未实测) | 认证方式和请求头对不上 | 走公司网关(见 3.6) |
@@ -302,7 +301,7 @@ OPENAI_COMPAT_API_KEY=<你的网关 key>
 | 路径 | 动作 |
 |---|---|
 | `~/.config/opencode/plugins/claude-mem.js` | 新增(拷贝编译好的插件) |
-| `~/.config/opencode/opencode.json` | 读取并写入:在 `plugin`(OpenCode v1)或 `plugins` 数组加插件路径;解析到 `mcp-server.cjs` 时注册本地 MCP。**本机原本没有此文件,可能新建** |
+| `~/.config/opencode/opencode.json` | 读取并写入:在 `plugin`(OpenCode v1)或 `plugins` 数组加插件路径;解析到 `mcp-server.cjs` 时注册本地 MCP;文件不存在就新建。本机现已是既有主配置文件,安装器就地改。OpenCode 2 会自己从 `plugins/claude-mem.js` 加载,安装器对 V2 会去掉 config 里的 plugin 条目(因为文件路径会报 "configured plugin path must be a directory") |
 | 全局 `AGENTS.md` | 清理旧版本的 claude-mem 记忆块 |
 
 **DSH 侧**(以下是官方安装器会做的事;本机 `desktop` profile 装不了,是手动做的,见 [[claude-mem-跨端共享]] 第 8 节)
@@ -418,12 +417,26 @@ DSH 装好后同样做一遍,并验证跨来源召回。旧笔记提到可打开
 
 ### 5.2 升级
 
+本机 2026-11-11 从 15.12.1 升到 v15.16.0,实际做法:
+
 ```bash
-npx claude-mem update
+# 升级前备份数据库和配置
+cp ~/.claude-mem/claude-mem.db ~/.claude-mem/claude-mem.db.bak
+cp ~/.claude-mem/settings.json ~/.claude-mem/settings.json.bak
+cp ~/.config/opencode/opencode.json ~/.config/opencode/opencode.json.bak
+
+npx claude-mem@latest install --ide opencode
+npx claude-mem@latest restart      # 升级后需重启 worker
 npx claude-mem doctor
 ```
 
-升级后同样重启 OpenCode,并重新核对 `opencode.json` 有没有被改动。
+要点:
+
+- 必须单独写 `--ide opencode`:整体跑 `npx claude-mem install` 曾报 `all-ides-failed`,单独指定 `--ide` 可绕过。
+- 升级后配置(`settings.json`、`~/.chroma_env`)不会被覆盖。
+- 升级后重启 OpenCode,并重新核对 `opencode.json` 有没有被改动。
+- 版本记录与逐次升级细节见 [[claude-mem-升级与版本记录]]。
+- 旧写法 `npx claude-mem update` 只刷新钩子和依赖,本机升级没有用它。
 
 ### 5.3 卸载
 
@@ -446,8 +459,7 @@ rm -rf ~/.claude-mem
 
 卸载后核对:
 
-- 本机原先的 `opencode.jsonc` 里没有 claude-mem 条目(安装器没写过它,所以也不会清它)。
-- 若曾手工把 claude-mem 配置合并进 `opencode.jsonc`,**卸载不会清这部分**,要手工删。这一条是据"安装器只处理 `opencode.json`"的推断。
+- 本机配置已统一为 `opencode.json`,正是安装器会处理的那份;卸载后核对其中 claude-mem 的 MCP 条目是否已清掉(是否清干净没实测)。
 - DSH 侧是否一并移除 profile 里的插件,没读到,装/卸前后对比 `~/.dsh/profiles`。
 - 恢复 opencode-mem:把 2.3 节注释掉的条目放开。
 
@@ -479,7 +491,7 @@ npx claude-mem restore <file>   # 恢复
 | 提示 `The worker port is held by another process` | worker 端口被别的进程占了 | `lsof -i -P` 找占用者,结束它或 `npx claude-mem stop` 后 `start`;端口键是 `CLAUDE_MEM_WORKER_PORT`,默认 `37700 + (uid % 100)`,你这台机器是 `37701`,见 [[claude-mem-配置详解]] |
 | worker 起不来或卡住 | 进程异常、依赖缺失 | `npx claude-mem doctor` → `restart`;仍不行看日志(日志位置没读到) |
 | 提示语义搜索未启用 | Chroma 退出或 `uvx` 找不到 | 确认 `uv --version`,没有就让安装器重装(`repair` 是否覆盖这一点没读到)或手动装 uv;再 `doctor` |
-| 装完 OpenCode 配置失效 | 新生成 `opencode.json` 与 `opencode.jsonc` 并存(**未验证**是否冲突) | 按 3.0 节处理,必要时用 `.bak` 恢复 |
+| 装完 OpenCode 配置异常 | 安装器改了 `opencode.json`(加 MCP 条目,V2 下还会去掉 plugin 条目);`opencode.json` 与 `opencode.jsonc` 并存不会冲突(V2 实测) | 按 3.0 节核对 `opencode.json`,必要时用 `.bak` 恢复 |
 | 中文查不到语义相近的笔记 | 向量嵌入默认是英文模型 | 关键词检索(中文子串匹配)可用,语义检索偏弱,属推测,要实测;详见 [[claude-mem-深入调研]] |
 | 笔记重复出现在会话里 | opencode-mem 没停 | 回到 2.3 节暂停它 |
 
@@ -499,7 +511,7 @@ npx claude-mem restore <file>   # 恢复
 10. **tree-sitter 下载得到空内容的原因**:疑为公司网络或镜像拦截,**未证实**;"自替换交接超时"告警的原因没查。
 11. **日志文件位置**:没记录。worker 端口键已确认是 `CLAUDE_MEM_WORKER_PORT`,默认 `37700 + (uid % 100)`。
 12. **`repair`、`prune`、`search`、`teambrain` 等命令的细节参数**:没读到;`install`/`restart`/`restore`/`search`/`start`/`status`/`stop`/`uninstall`/`update` 在源码命令分支中存在,具体参数未读。
-13. **卸载是否清理 DSH 侧 profile 里的插件**,以及卸载不清手工合并内容:后者是推断。
+13. **卸载是否清理 DSH 侧 profile 里的插件**:没读到。
 14. **匿名统计具体发什么**:没读。
 
 ---

@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "claude-mem 从 0 到 1:让 OpenCode 和 DSH 共用一份本地长期记忆"
 created: 2026-11-09
-updated: 2026-11-09
+updated: 2026-11-11
 tags:
   - learning
   - opencode
@@ -14,6 +14,7 @@ tags:
   - 复现
 related:
   - "[[claude-mem-安装部署]]"
+  - "[[claude-mem-升级与版本记录]]"
   - "[[claude-mem-调教清单]]"
   - "[[claude-mem-配置详解]]"
   - "[[claude-mem-本地多语言向量方案]]"
@@ -27,9 +28,9 @@ related:
 
 > 一句话:**一个本机常驻进程(worker)把两个编码工具的对话提炼成"观察",存进同一个本地数据库;下次开会话时再把相关记忆塞回去。**
 >
-> 这篇是总览,按"我怎么一步步做出来"的顺序写,照着能复现。每一步只讲做什么、怎么验、踩过什么坑;原理和全部细节在其他 7 篇里,这里用链接指过去,不重复。
+> 这篇是总览,按"我怎么一步步做出来"的顺序写,照着能复现。每一步只讲做什么、怎么验、踩过什么坑;原理和全部细节在同目录其他各篇里,这里用链接指过去,不重复。
 >
-> 依据:2026-11-08 到 11-09 在本机(macOS、M4 Pro、48GB)的实际操作和实测,claude-mem 15.12.0 升到 15.12.1。凡是只读了源码没实测的,正文里标了"未证实"。
+> 依据:2026-11-08 到 11-09 在本机(macOS、M4 Pro、48GB)的实际操作和实测,claude-mem 15.12.0 升到 15.12.1;**2026-11-11 又升到 v15.16.0**(升级路径见 2.3,版本记录见 [[claude-mem-升级与版本记录]])。凡是只读了源码没实测的,正文里标了"未证实"。
 
 ---
 
@@ -69,7 +70,7 @@ DSH ←──插件(只负责读)── worker
 |---|---|
 | 数据库 | `~/.claude-mem/claude-mem.db`,2026-11-09 下午实测 619 条观察、122 条摘要、208 条提问(会随使用增长) |
 | 来源 | `opencode` 13 个会话、`dsh` 4 个、`claude` 1 个(`sdk_sessions.platform_source`) |
-| worker | 15.12.1,端口 37701(默认端口按用户 uid 算,别人机器上不一定是这个) |
+| worker | v15.16.0(2026-11-11 从 15.12.1 升级),端口 37701(默认端口按用户 uid 算,别人机器上不一定是这个) |
 | 观察者 | `openai-compatible` 提供方,走公司网关,模型 `deepseek-v4.1-flash`,中文输出 |
 | 向量 | 本机 Ollama 的 `bge-m3`,1024 维 |
 | 隐私 | 入库前脱敏、不存图、云同步和托管记忆全关 |
@@ -126,7 +127,7 @@ DSH ←──插件(只负责读)── worker
 **先备份**(安装器会改配置):
 
 ```bash
-cp ~/.config/opencode/opencode.jsonc ~/.config/opencode/opencode.jsonc.bak
+cp ~/.config/opencode/opencode.json ~/.config/opencode/opencode.json.bak
 cp -r ~/.config/opencode/plugins ~/.config/opencode/plugins.bak
 ```
 
@@ -148,32 +149,51 @@ npx claude-mem doctor                 # 体检
 | worker 在 37701 起来,`/api/projects` 出现来源 `opencode` | 说明插件被自动加载并写入成功 |
 | 观察 0 条,队列积压 | 因为本机没有 claude,观察者不工作。**预期内**,下一步就换掉 |
 
-### 2.1 一个必须处理的坑:`opencode.json` 与 `opencode.jsonc`
+### 2.1 配置文件:`opencode.json` 与 `opencode.jsonc`
 
-安装器只读写 `opencode.json`,不认 `opencode.jsonc`。如果你和我一样用的是 `.jsonc`,装完会**另生成一个 `opencode.json`**。
+安装器写死只读写 `~/.config/opencode/opencode.json`(`OpenCodeInstaller.ts:109`),不检查 `opencode.jsonc`,不存在就新建。如果你和我一样原来用的是 `.jsonc`,装完会**另生成一个 `opencode.json`**。
+
+实测(OpenCode V2,本机 v2.2.6,`opencode debug config`):`opencode.json` 与 `opencode.jsonc` **都会读取并合并**,并存不冲突,claude-mem 只加载一份。我 11-08 当时手工把 MCP 并进了 `.jsonc`、移走 `.json`,这个方向后来证明没必要,现已统一为 **`opencode.json`**(原 `.jsonc` 无注释,已合并并删除),以后新增配置都改 `opencode.json`。
 
 我的做法:
 
-1. 看新生成的 `opencode.json` 里写了什么(主要是 claude-mem 的 MCP 配置)。
-2. 把那段 MCP 并进自己的 `opencode.jsonc`:
+1. 装完看 `opencode.json` 里写了什么(主要是 claude-mem 的 MCP 配置),用 `opencode debug config` 看合并后的最终配置。
+2. 两个文件想统一就以 `opencode.json` 为准:备份后把 `.jsonc` 内容并进去再移走。V2 里 MCP 在 `debug config` 中显示为 `mcp.servers.<名字>`(V1 写法 `mcp.<名字>` 仍兼容):
 
 ```jsonc
 "mcp": {
-  "claude-mem": {
-    "type": "local",
-    "command": [
-      "<node 的绝对路径>",
-      "<家目录>/.claude/plugins/marketplaces/thedotmack/plugin/scripts/mcp-server.cjs"
-    ]
+  "servers": {
+    "claude-mem": {
+      "type": "local",
+      "command": [
+        "<node 的绝对路径>",
+        "<家目录>/.claude/plugins/marketplaces/thedotmack/plugin/scripts/mcp-server.cjs"
+      ]
+    }
   }
 }
 ```
 
-3. 把 `opencode.json` 移走备份,重启 OpenCode,`opencode mcp list` 确认全部 connected。
+(上面是 V2 形状,具体字段以安装器实际生成的为准。)
+
+3. 重启 OpenCode,`opencode mcp list` 确认全部 connected。
+4. 插件注册:OpenCode 2 会自己从 `plugins/claude-mem.js` 加载;安装器对 V2 会去掉 config 里的 plugin 条目(文件路径会报 "configured plugin path must be a directory"),所以 `opencode.json` 里没有 claude-mem 的 plugin 条目是正常的。
 
 ### 2.2 另一个坑:`claude-mem.js` 不要入库
 
 `~/.config/opencode/plugins/claude-mem.js` 是安装器构建出来的约 500KB 产物。我试过把它放进配置仓库,被代码平台的自动审查拦下(它扫的是压缩后的第三方代码)。结论:**加进 `.gitignore`,不入库**。
+
+### 2.3 升级路径(2026-11-11,15.12.1 → v15.16.0)
+
+```bash
+# 升级前备份 claude-mem.db 和配置文件(settings.json 等)
+npx claude-mem@latest install --ide opencode
+npx claude-mem@latest restart       # 升级后需重启 worker
+```
+
+- 必须单独写 `--ide opencode`:整体 `npx claude-mem install` 曾报 `all-ides-failed`,单独指定可绕过。
+- 升级后配置(`settings.json`、`~/.chroma_env`)不会被覆盖。
+- 详细记录见 [[claude-mem-升级与版本记录]];完整升级步骤见 [[claude-mem-安装部署]] 5.2。
 
 ---
 
@@ -219,7 +239,7 @@ curl -s http://127.0.0.1:37701/api/health      # ai.provider 应为 openai-compa
 
 ## 4. 第 3 步:隐私与采集
 
-这一步是"先把不该发的堵住"。我改了 7 个隐私键、6 个采集键(只有一个真正有效)。
+这一步是"先把不该发的堵住"。我改了 7 个隐私键、6 个采集键(其中 SKIP_TOOLS、SKIP_BASH_PATTERNS 在 OpenCode 下有效,见 4.2)。
 
 ### 4.1 隐私(第 2 轮)
 
@@ -232,21 +252,34 @@ curl -s http://127.0.0.1:37701/api/health      # ai.provider 应为 openai-compa
 | `CLAUDE_MEM_CLOUD_SYNC_HUB_URL`、`_TOKEN`、`_USER_ID` | 全部留空 | **必须为空**,空即关闭云同步 |
 | `CLAUDE_MEM_PRO_MEMORY_KEY`、`_BASE_URL`、`_MODEL` | 全部留空 | **必须为空**,填了 KEY 观察内容会交给云端模型 |
 
+脱敏两个键 `REDACT_ENABLED`、`REDACT_GENERIC_ENABLED` 默认都是 `false`(opt-in),本机两项都已设 `true`。v15.15.2 起 `REDACT_ENABLED=true` 时,server capture 的数据在离开本机前先脱敏;本机是本地 worker 模式,该改动对本机是否实际生效**未核对**。
+
 `CLAUDE_MEM_CLOUD_SYNC_DEVICE_ID` 有值是正常的:首次启动自动生成的本机标识,**不是云同步开关**。别删,和数据库不一致会报错。
 
 ### 4.2 采集(第 3 轮)
 
-只有 `CLAUDE_MEM_SKIP_TOOLS` 在 OpenCode 下真正有效:跳过低价值工具,少调观察者、少噪音。我在出厂默认的 5 个后面,按近 30 天实际调用追加了 9 个:
+采集过滤是**两层**:第 1 层是硬规则(`SKIP_TOOLS`、`SKIP_BASH_PATTERNS`、项目排除、subagent 开关),在入口直接拦;第 2 层是观察者 LLM 按 `skip_guidance` 提示词自行判断,**不可靠**(我的仓库实测第一版 0/4)。claude-mem 没有"按技能/会话整体排除"的开关。
+
+在 OpenCode 下各键的有效性(v15.16.0 复核):
+
+| 键 | OpenCode 下 | 说明 |
+|---|---|---|
+| `CLAUDE_MEM_SKIP_TOOLS` | 有效 | 整名精确相等、不分大小写、不支持通配符 |
+| `CLAUDE_MEM_SKIP_BASH_PATTERNS` | v15.16.0 起有效,有适用条件 | 15.12.x 时无效(上游 #5666:插件上报小写 `bash`,worker 只认大写);v15.16.0 插件映射表把 `bash` 映射为 `Bash`(`read/write/edit` 同样映射为大写),worker 的 `shellCommandOf` 只认 `Bash/PowerShell/exec_command`。接口实测:`Bash` + 命中脚本 → `skipped(bash_pattern_excluded)`;小写 `bash` 仍 `queued`。只拦命中的脚本调用本身,**拦不住 `cd` 进目录后用相对路径调用,也拦不住 `curl` 读旧记忆** |
+| `CLAUDE_MEM_SKIP_SUBAGENT_OBSERVATIONS`、`CLAUDE_MEM_SKIP_AGENT_TYPES` | 无效 | 判定需 `agentId` 与 `agentType` 同时存在,OpenCode 插件两者都不带 |
+
+`SKIP_TOOLS` 用来跳过低价值工具,少调观察者、少噪音。我在出厂默认的 5 个后面,按近 30 天实际调用追加了 9 个,后来又加了 3 个记忆检索工具(现共 17 项):
 
 ```text
 ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUserQuestion,
 glob,question,session_search,lsp_prepare_rename,lsp_diagnostics,
-background_cancel,invalid,zhiyan-log_GetCurrentTimestamp,iWiki_prepareAttachmentUpload
+background_cancel,invalid,zhiyan-log_GetCurrentTimestamp,iWiki_prepareAttachmentUpload,
+claude_mem_search,claude_mem_timeline,claude_mem_get_observations
 ```
 
-OpenCode 的工具名是小写,`SKIP_TOOLS` 不分大小写,实测有效。**注意:这份名单是我的工具集决定的,你要按自己的调用情况选。**
+OpenCode 的工具名是小写,`SKIP_TOOLS` 不分大小写,实测有效。新增的三个 `claude_mem_*` 是 claude-mem 自己的检索工具(worker 另有内置 `memory_retrieval` 规则,也会跳过它们)。**注意:这份名单是我的工具集决定的,你要按自己的调用情况选。**
 
-其余 5 个采集键在 OpenCode 下无效或暂时不需要,没改。详见 [[claude-mem-调教清单]] 第 2、3 轮。
+其余采集键暂时不需要,没改。详见 [[claude-mem-调教清单]] 第 2、3 轮。
 
 ### 4.3 注入与检索(第 4、5 轮)
 
@@ -458,12 +491,12 @@ OpenCode 插件每次请求都重读这个文件,改完不用重启 OpenCode。D
 > 假设你和我一样:macOS、用 OpenCode、有一个 OpenAI 兼容的观察者端点、想接 DSH 且 profile 是 `desktop`。条件不同的地方会写明。
 
 ```text
-[ ] 0. node -v 达标;备份 opencode.jsonc 和 plugins/
+[ ] 0. node -v 达标;备份 opencode.json 和 plugins/
 [ ] 1. 停掉其他记忆插件(如 opencode-mem)
 [ ] 2. npx claude-mem install --ide opencode --provider claude
 [ ] 3. npx claude-mem telemetry disable
-[ ] 4. 若生成了 opencode.json:把 claude-mem 的 mcp 并入 opencode.jsonc,
-       移走 opencode.json,重启 OpenCode,opencode mcp list 全部 connected
+[ ] 4. 若同时有 opencode.json 与 opencode.jsonc:并存不冲突;想统一就以
+       opencode.json 为准;重启 OpenCode,opencode mcp list 全部 connected
 [ ] 5. ~/.claude-mem/.env 写 OPENAI_COMPAT_API_KEY=<key>
 [ ] 6. settings.json 设观察者 5 键(PROVIDER/PRESET/BASE_URL/MODEL/MODE)
 [ ] 7. settings.json 设隐私键(REDACT x2、MEDIA_CAPTURE=false、TELEGRAM=false)
@@ -524,7 +557,7 @@ sqlite3 -readonly ~/.claude-mem/claude-mem.db \
 
 | 坑 | 现象 | 原因 / 处理 |
 |---|---|---|
-| 安装器另生成 `opencode.json` | 与 `opencode.jsonc` 并存 | 见 2.1,手工合并后移走 |
+| 安装器另生成 `opencode.json` | 与 `opencode.jsonc` 并存 | 实测不冲突(V2 两文件合并读取);本机统一为 `opencode.json`,见 2.1 |
 | 观察者一直不工作 | 观察 0 条、队列积压 | 默认走 `claude`,本机没登录。换 `openai-compatible` |
 | 直连 codebuddy 不行 | 认证和请求头对不上(推断) | 走公司网关 |
 | 切换观察者后旧积压没补 | 日志 "Skipped expired live observer inputs" | 过期输入不重放;提问原文仍在 `user_prompts` |
@@ -595,6 +628,7 @@ sqlite3 -readonly ~/.claude-mem/claude-mem.db \
 | 11-09 上午 | 第 6 轮:接 DSH。官方安装器对 `desktop` 必败;手动加插件、加监听;worker 升到 15.12.1 |
 | 11-09 | 三个方向实测:DSH 写、OpenCode 搜到;DSH 启动注入;DSH `mem_search` 搜到 OpenCode 记忆 |
 | 11-09 下午 | 订正文档里已被实测推翻或证实的旧"未实测"说法;查清 `Missing last_assistant_message` 与 My Work 空页面的成因;向上游提交 #5535 |
+| 11-11 | 升级到 v15.16.0(`npx claude-mem@latest install --ide opencode` + `restart`);验证 #5666 已修;统一 `opencode.json`;`SKIP_TOOLS` 增至 17 项(见 [[claude-mem-升级与版本记录]]) |
 
 ---
 
@@ -603,6 +637,7 @@ sqlite3 -readonly ~/.claude-mem/claude-mem.db \
 | 想了解 | 读 |
 |---|---|
 | 完整安装步骤、故障表、卸载 | [[claude-mem-安装部署]] |
+| 升级记录、各版本变化 | [[claude-mem-升级与版本记录]] |
 | 每一个配置键是什么意思 | [[claude-mem-配置详解]] |
 | 每个键我是怎么决定改不改的 | [[claude-mem-调教清单]] |
 | Ollama + bge-m3 的原理、验收、对比 | [[claude-mem-本地多语言向量方案]] |

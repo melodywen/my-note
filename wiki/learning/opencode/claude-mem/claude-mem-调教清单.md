@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "claude-mem 调教清单"
 created: 2026-11-08
-updated: 2026-11-10
+updated: 2026-11-11
 tags:
   - learning
   - opencode
@@ -25,7 +25,7 @@ related:
 
 > 一句话:**238 个键里真正值得调的只有 40 个左右。这篇把它们按"先后顺序"分成 8 轮,每轮只动几个键,改完有验证方法,不满意有回退值。**
 >
-> 全表看 [[claude-mem-配置详解]]。本篇的默认值和行为来自读源码(约 v15.12.0);第 1、2、3 轮已在本机配置并实测,结果写在各轮的"实测结果"里,其余轮次仍是读源码的结论,标"推断"的是我根据调用路径推的。
+> 全表看 [[claude-mem-配置详解]]。本篇的默认值和行为来自读源码(约 v15.12.0;采集过滤一轮已在 v15.16.0 复核,`SKIP_BASH_PATTERNS` 的结论因此改变,见第 3 轮);第 1、2、3 轮已在本机配置并实测,结果写在各轮的"实测结果"里,其余轮次仍是读源码的结论,标"推断"的是我根据调用路径推的。
 
 > 关于注释:`settings.json` 是严格 JSON 解析,**不能写注释**。键的说明放在配置仓库的 `claude-mem/settings.example.jsonc`(带行内注释的示例文件,与真实 `settings.json` 的键一一对应),改键时对照它看。
 
@@ -62,7 +62,7 @@ npx claude-mem restart
 | 第 0 轮 | 先别动,记下"出厂状态" | 0 | 必做 | 已做 |
 | 第 1 轮 | 观察者:接上 codebuddy(经公司网关)、中文输出 | 6 | 必改 | 已做,实测通过 |
 | 第 2 轮 | 隐私:不泄密、不外发、不存图 | 7 | 必改 | 已做,脱敏已验证 |
-| 第 3 轮 | 采集:什么该记、什么不该记 | 6 | 建议 | 已做,仅 SKIP_TOOLS 有效,其余 5 键在 OpenCode 下无效或暂不需要;另有 mode 层跳过规则,见本轮"observer 的跳过规则" |
+| 第 3 轮 | 采集:什么该记、什么不该记 | 6 | 建议 | 已做,SKIP_TOOLS 有效,SKIP_BASH_PATTERNS 自 v15.16.0 起有效(有限制),SKIP_SUBAGENT_OBSERVATIONS / SKIP_AGENT_TYPES 在 OpenCode 下无效,其余暂不需要;另有 mode 层跳过规则,见本轮"observer 的跳过规则" |
 | 第 4 轮 | 注入:开会话时塞多少旧记忆 | 6 | 建议 | 已测,保持默认,一个键都没改 |
 | 第 5 轮 | 检索:中文召回与 90 天窗口 | 4 | 已完成 | 已做:`SEARCH_RECENCY_DAYS` 改为 `0`,其余 3 键保持默认;之后又上线本地 bge-m3 向量(及格非达标,见[[claude-mem-本地多语言向量方案]]) |
 | 第 6 轮 | 跨端:OpenCode 与 DSH 共用 | 3 | 已完成 | 已做:`SESSION_START_INCLUDE_ALL_SOURCES="true"`;`desktop` profile 官方安装器必败,改为手动加插件和监听文件(见[[claude-mem-跨端共享]] 第 8 节)。三个方向已实测通 |
@@ -281,14 +281,14 @@ lsof -i -P | grep -i cmem
 
 少记噪音,省观察者的调用次数(省钱省时间),也让记忆更干净。
 
-### 先说结论:6 个键里,在 OpenCode 下真正有用的只有 SKIP_TOOLS
+### 先说结论:6 个键里,在 OpenCode 下有用的是 SKIP_TOOLS 和 SKIP_BASH_PATTERNS(后者 v15.16.0 起)
 
-2026-11-08 逐个键用探针实测(往 `POST /api/sessions/observations` 发构造的工具事件,看返回 `skipped` 还是 `queued`),并读了 OpenCode 插件源码(`integrations/opencode-plugin/core.ts`)。
+2026-11-08 逐个键用探针实测(往 `POST /api/sessions/observations` 发构造的工具事件,看返回 `skipped` 还是 `queued`),并读了 OpenCode 插件源码(`integrations/opencode-plugin/core.ts`)。`SKIP_BASH_PATTERNS` 一行在 v15.12.x 时实测无效,2026-11-11 升到 v15.16.0 后复测已生效,下表按 v15.16.0 写。
 
 | 键 | 在 OpenCode 下 | 证据 |
 |---|---|---|
 | `SKIP_TOOLS` | **有效** | 实测:新增的 9 个工具名都返回 `skipped / tool_excluded`;`bash`、`read`、`grep`、`edit`、`write`、`task` 等 10 个对照仍入队。不区分大小写,`todowrite` 与 `TodoWrite` 都跳 |
-| `SKIP_BASH_PATTERNS` | **无效** | 实测:设规则 `^echo CM_R3_PROBE` 后,工具名 `Bash` 被跳过(`bash_pattern_excluded`),但 `bash` 和 `shell` 照常入队。源码 `shellCommandOf` 只认 `Bash`、`PowerShell`、`exec_command` 三个名字,OpenCode 的命令工具叫小写 `bash`。要让它生效得改源码。**2026-11-10 复测(同样结论)**:规则 `memory-consolidate/scripts/(write_memory|archive_delete|restore_archive)\.py`,同一条命令只换工具名,`Bash`→`skipped`,`bash`→`queued`,`shell`→`queued`;worker 热读新值,不用重启。**本机现状:`settings.json` 已配上这条规则**(为拦记忆整理脚本的调用),对 OpenCode 暂不生效,留着等上游修;不打补丁(插件 `claude-mem.js` 与官方 dist 逐字节相同、未进 git,升级会被覆盖。已提上游 issue:https://github.com/thedotmack/claude-mem/issues/5666) |
+| `SKIP_BASH_PATTERNS` | **有效(v15.16.0 起,有限制)** | 历史:v15.12.x 时无效。worker 的 `shellCommandOf` 只认 `Bash`、`PowerShell`、`exec_command` 三个名字,而 OpenCode 的命令工具叫小写 `bash`,拿不到命令文本,正则没被检查(2026-11-08、11-10 两次实测:同一条命令 `Bash`→`skipped`,`bash`/`shell`→`queued`)。已提上游 issue #5666。**v15.16.0 已修**:opencode 插件的映射表把 `bash` 映射成 `Bash`(`read`/`write`/`edit` 同样映射成大写)。接口实测:`Bash` + 命中 `write_memory.py`/`archive_delete.py` → `skipped`(`bash_pattern_excluded`);小写 `bash` 仍 `queued`(说明起作用的是插件映射,不是 worker 改认小写)。worker 热读新值,不用重启。**本机现状:`settings.json` 已配规则** `memory-consolidate/scripts/(write_memory\|archive_delete\|restore_archive)\.py`。**限制(别指望它拦全):** ① 只拦命中规则的那条脚本调用本身;② 拦不住 `cd` 进目录后用相对路径调用(命令里没有 `scripts/` 前缀);③ 拦不住读旧记忆的 `curl .../api/observations/batch`。对 memory-consolidate 技能文档里的标准调用形态逐条对正则:标准形态、带 `CM_BASE` 前缀、绝对路径、heredoc、管道传标准输入都命中;`cd` 后相对路径和 `curl` 不命中 |
 | `SKIP_SUBAGENT_OBSERVATIONS` / `SKIP_AGENT_TYPES` | **无效** | 实测:请求带 `agentId` 和 `agentType` 时被跳过,不带则入队。源码判定"子代理事件"要求两个字段同时有值;而 OpenCode 插件发给 worker 的字段里没有 `agentId`、`agentType`(`captureTool` 只发 `contentSessionId`、`tool_name`、`tool_input`、`tool_response`、`cwd`、`platform_source`、`tool_use_id`)。所以 OpenCode 的子代理工具调用在 worker 看来都是主代理。**没有在真实子代理场景再跑一遍**,但上述两项合起来足以判断 |
 | `EXCLUDED_PROJECTS` | 有效,但**当前不需要** | 实测:`/tmp/cm-r3-excluded/**` 配上后,该目录及其子目录返回 `project_excluded`,同级其他目录仍入队。你目前没有不想留记录的仓库,所以没配 |
 | `OBSERVE_BARE_PROMPTS` | 保持默认 `false` | 没改,没测 |
@@ -318,26 +318,28 @@ lsof -i -P | grep -i cmem
 
 ### 已配置的值
 
-只改了 `SKIP_TOOLS`,其余 5 个键保持出厂默认:
+改了 `SKIP_TOOLS`,另在 2026-11-10 配了 `SKIP_BASH_PATTERNS`(规则见上表),其余 4 个键保持出厂默认。`SKIP_TOOLS` 现共 17 项:
 
 ```text
-CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUserQuestion,glob,question,session_search,lsp_prepare_rename,lsp_diagnostics,background_cancel,invalid,zhiyan-log_GetCurrentTimestamp,iWiki_prepareAttachmentUpload
+CLAUDE_MEM_SKIP_TOOLS = ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUserQuestion,glob,question,session_search,lsp_prepare_rename,lsp_diagnostics,background_cancel,invalid,zhiyan-log_GetCurrentTimestamp,iWiki_prepareAttachmentUpload,claude_mem_search,claude_mem_timeline,claude_mem_get_observations
 ```
 
-前 5 个是出厂默认,后 9 个是新增。改后 worker 读到的值已核对,`settings.json` 软链未被破坏。
+前 5 个是出厂默认,中间 9 个是第 3 轮新增,最后 3 个(`claude_mem_*` 检索工具)是 2026-11-11 补的。改后 worker 读到的值已核对,`settings.json` 软链未被破坏。
+
+**`SKIP_TOOLS` 匹配规则**(源码 `src/shared/is-tool-skipped.ts`):按逗号拆开、转小写,**整名精确相等**才命中;不分大小写;**不支持通配符**,写 `claude_mem_*` 无效;带连字符的 `claude-mem_search` 不会跳过 `claude_mem_search`。OpenCode 插件源码(`v2.ts`)确认检索工具名无前缀,就叫 `claude_mem_search` 等。接口实测三者都返回 `skipped`,reason 是 `memory_retrieval`,是 worker 另有的内置规则拦的,所以即使不加也大概率不入库;补进 `SKIP_TOOLS` 是双保险。
 
 ### 刻意没跳的
 
 | 工具 | 为什么留着 |
 |---|---|
-| `bash` | 占一半,但里面有 `npm run build`、`curl`、`git` 等有价值的命令,也有 `cd`、`ls`、`cat` 噪音;`SKIP_BASH_PATTERNS` 无效,没法只滤噪音,整体跳会丢大量信息 |
+| `bash` | 占一半,但里面有 `npm run build`、`curl`、`git` 等有价值的命令,也有 `cd`、`ls`、`cat` 噪音;整体跳会丢大量信息;`SKIP_BASH_PATTERNS` v15.16.0 起可用,能按命令正则只滤指定脚本的调用,但 `cd`/`ls`/`cat` 这类噪音要写正则才能滤,没配 |
 | `read`、`grep`、`edit`、`write` | 是"改了什么、看了什么"的主要证据 |
 | `task`、`skill_mcp`、`webfetch`、`websearch_*`、`background_output` | 输出可能很长,但有研究结论价值。是否跳,要看实际产出的记忆质量,**没有数据支撑,不动** |
 
 ### 没解决的
 
-- `bash` 里的 `cd`、`ls`、`cat` 噪音压不掉,要改源码才行(把 `shellCommandOf` 加上小写 `bash`)。这是源码补丁,升级会冲掉,没做。
-- 子代理(约 9% 的调用)压不掉,原因同上,要让 OpenCode 插件发 `agentId`/`agentType`,也得改源码。
+- `bash` 里的 `cd`、`ls`、`cat` 噪音:v15.12.x 时压不掉(必须改源码);v15.16.0 起 `SKIP_BASH_PATTERNS` 对 OpenCode 生效,理论上可用正则压,但这类命令没写正则,**没配**。
+- 子代理(约 9% 的调用)压不掉:`SKIP_SUBAGENT_OBSERVATIONS` / `SKIP_AGENT_TYPES` 判定要 `agentId` 与 `agentType` 同时存在,OpenCode 插件不带这两个字段(`pending_messages` 里 `agent_id` 非空的记录为 0),v15.16.0 仍如此。**也不建议开 `SKIP_SUBAGENT_OBSERVATIONS`**:对 OpenCode 无效;即使有效,也会丢掉子代理做探索/实现/评审时有价值的发现。
 - 这一轮只是按工具名分类,没有评估"哪些工具产出的记忆质量高"。要做得精,需要跑几天后翻 viewer 看。
 
 ### observer 的跳过规则(mode 层,2026-11-10 补)
@@ -371,7 +373,7 @@ OpenCode 插件不发 `agentId`/`agentType`,`SKIP_SUBAGENT_OBSERVATIONS` 也压�
 - **软规则,不保证。** 模型可能把"已归档 #1482"当成有价值的发现照记。规则能压住多少,只能实测。第一版实测 4 次该跳的回执 0 次被跳,已改第二版,见 [[claude-mem-mode文件与覆盖机制]] 9.2。
 - **只管观察条目的生成。** 工具调用本身仍然送进 worker,原始调用另外同步落库(`upsertToolUse`)。这部分不进开场注入的 50 条,不占名额。
 
-**和 `SKIP_TOOLS` 的区别:** `SKIP_TOOLS` 在入队前按工具名拦,是硬规则,但只能按工具名,拦不了"整理流程里的 shell 调用"而不误伤别的 shell。`skip_guidance` 是 observer 看到内容后自己判断,能按"这件事是不是整理回执"来跳过,但不保证。两者是两道关,可以同时用。
+**和 `SKIP_TOOLS` 的区别:** `SKIP_TOOLS` 在入队前按工具名拦,是硬规则,但只能按工具名,拦不了"整理流程里的 shell 调用"而不误伤别的 shell(按命令正则拦要靠 `SKIP_BASH_PATTERNS`,v15.16.0 起对 OpenCode 有效,有限制,见上)。`skip_guidance` 是 observer 看到内容后自己判断,能按"这件事是不是整理回执"来跳过,但不保证。两者是两道关,可以同时用。
 
 **可选的调法(没实测):** 不改插件文件(更新会被覆盖),用官方支持的覆盖 mode:
 1. 新建覆盖文件(用户 mode 目录,见 [[claude-mem-配置详解]] 的 modes 说明;**文件名是 `code--<名字>.json`,不带 `zh`**,原因见 [[claude-mem-mode文件与覆盖机制]] 2.1),只写 `prompts.skip_guidance`,在默认文本基础上追加规则:记忆维护类调用(写入/归档/恢复记忆)一律跳过、除非失败;其他操作回执结果符合预期就跳过。具体写法见下面的覆盖文件。
@@ -430,11 +432,38 @@ OpenCode 插件不发 `agentId`/`agentType`,`SKIP_SUBAGENT_OBSERVATIONS` 也压�
 
 ### 回退
 
-把 `SKIP_TOOLS` 改回出厂默认(前 5 个)即可。已记的笔记不会被删,只影响新采集。
+把 `SKIP_TOOLS` 改回出厂默认(前 5 个)、`SKIP_BASH_PATTERNS` 清空即可。已记的笔记不会被删,只影响新采集。
 
 ### 总开关
 
 `OBSERVER_ENABLED` 默认 `true`,显式写 `"false"` 才关闭"新笔记和会话摘要"的生成;写错按开启处理。想临时停止记忆,用这个。
+
+### 整理链路的采集到底拦住了什么(2026-11-11 补)
+
+**采集是两层:**
+- 第 1 层硬规则,在入口拦:`SKIP_TOOLS`、`SKIP_BASH_PATTERNS`、`EXCLUDED_PROJECTS`(按 `cwd`)、subagent 开关(对 OpenCode 无效)。
+- 第 2 层是观察者 LLM 按 `skip_guidance` 提示词自行判断,**不可靠**(用户仓库实测第一版 0/4)。
+
+claude-mem **没有按技能/会话整体排除的开关**,它不知道哪些调用属于"整理"流程。能整体排除的粒度只有:整个工具名、命令正则、整个项目(`EXCLUDED_PROJECTS`,按 `cwd`;**没实测** OpenCode 起子代理时能否指定 `cwd`)。
+
+memory-consolidate 整理链路各环节是否入库(v15.16.0):
+
+| 链路环节 | 是否入库 | 原因 |
+|---|---|---|
+| 主 agent 调检索 MCP(`claude_mem_search` 等) | 不入库 | worker 内置规则(`memory_retrieval`),`SKIP_TOOLS` 也已补 |
+| `task` / subagent 下发 | **入库** | 工具名不在跳过清单,subagent 开关对 OpenCode 无效 |
+| subagent 读旧记忆(`curl .../api/observations/batch`) | **入库** | 正则不命中 `curl` |
+| 写正文(`write` 或 bash `cat >`) | **入库** | 不命中脚本正则 |
+| 三个脚本的 bash 调用(`write_memory.py`/`archive_delete.py`/`restore_archive.py`) | 不入库 | `SKIP_BASH_PATTERNS` 硬规则(v15.16.0 起) |
+| assistant 回复 | **入库** | 无对应硬规则 |
+
+库里 #1813–#1836 一批"整理过程本身被记成 discovery"就是这些仍入库的环节造成的。
+
+**可行办法:**
+- `SKIP_TOOLS` 补工具名:只能按整名,检索类已补(见上"已配置的值")。
+- bash 正则追加 `api/(observations/batch|import)` 可拦 `curl` 读旧记忆;**只是建议,未配置**。
+- `EXCLUDED_PROJECTS`:把整理放到单独项目目录里跑再整体排除,**没实测**。
+- 不建议开 `SKIP_SUBAGENT_OBSERVATIONS`(对 OpenCode 无效,有效也会丢掉子代理的有价值发现)。
 
 ---
 

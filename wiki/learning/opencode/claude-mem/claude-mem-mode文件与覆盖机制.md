@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "claude-mem mode 文件与覆盖机制"
 created: 2026-11-10
-updated: 2026-11-10
+updated: 2026-11-11
 tags:
   - learning
   - opencode
@@ -21,7 +21,7 @@ related:
 
 > 一句话:**`CLAUDE_MEM_MODE` 不是"选一个文件",而是一个"配方":worker 按 `--` 把它拆成几个文件,从左到右依次叠加(后面的盖前面的),叠出来的结果就是观察者(observer)模型的完整系统提示词。想改 observer 的行为,新建一个只写要改的那几个键的 JSON 放到用户目录即可,不用碰插件文件。**
 >
-> 本篇的结论来自读 `plugin/scripts/worker-service.cjs`(约 v15.12.x)和 `plugin/modes/*.json`。标"推断"或"没实测"的地方,是读代码得出、还没跑过 worker 验证的。
+> 本篇的结论来自读 `plugin/scripts/worker-service.cjs`(约 v15.12.x;v15.16.0 已复核采集过滤相关结论,见 9.4)和 `plugin/modes/*.json`。标"推断"或"没实测"的地方,是读代码得出、还没跑过 worker 验证的。
 
 ---
 
@@ -378,7 +378,7 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 | 改 observer 的语气、记录标准、跳过规则 | 改"哪些工具调用会进入 observer"(那是 `SKIP_TOOLS`、`SKIP_BASH_PATTERNS`,在入队前拦) |
 | 改观察的类型表、概念表、字段写法 | 改观察存哪、怎么检索 |
 | 改输出语言 | 保证 observer 一定照做:提示词是给 LLM 的文字,是**软规则** |
-| 不碰插件文件,插件升级不会被覆盖 | 区分主会话和子会话(OpenCode 插件不传 `agentId`) |
+| 不碰插件文件,插件升级不会被覆盖 | 区分主会话和子会话(OpenCode 插件不传 `agentId`,所以 subagent 开关对 OpenCode 无效) |
 
 **有一句硬编码的话 mode 改不了。** 每次发给 observer 的指令里,在 `skip_guidance` 之外还有一段写死在 worker 里的文字:
 
@@ -416,6 +416,8 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 ## 9. 本机现状(2026-11-10)
 
+> 总结:claude-mem **没有按技能/会话整体排除的开关**,它不知道哪些调用属于"整理"流程。能整体排除的只有整个工具名(`SKIP_TOOLS`)、命令正则(`SKIP_BASH_PATTERNS`)、整个项目(`EXCLUDED_PROJECTS`,按 `cwd`,未实测);其余靠 observer 按 `skip_guidance` 自行判断,不可靠。整理链路各环节实际入库与否,见 [[claude-mem-调教清单]] 第 3 轮"整理链路的采集到底拦住了什么"。
+
 | 项 | 状态 |
 |---|---|
 | `CLAUDE_MEM_MODE` | `code--zh--lean`(2026-11-10 10:56 启用;11:13 第二版规则写入后再次重启 worker) |
@@ -426,7 +428,7 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 | 启用前基线 | my-note 最大观察 ID 1787,共 1256 条 |
 | 第一版规则测试 | 11:03–11:08 测两次,结果见 9.2 |
 | 第二版规则 | 11:13 重启后生效,此时 my-note 最大观察 ID 1824,效果见 9.3 |
-| 硬规则 `SKIP_BASH_PATTERNS` | 已写进 `settings.json` 与 `settings.example.jsonc`,**对 OpenCode 无效**(见 9.4) |
+| 硬规则 `SKIP_BASH_PATTERNS` | 已写进 `settings.json` 与 `settings.example.jsonc`,**v15.16.0 起对 OpenCode 生效**,有三条限制(见 9.4);v15.12.x 时无效 |
 
 ---
 
@@ -473,11 +475,11 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 
 **第二版实测结果(11:17,1 组融合):** ID 1831 之后 7 条,其中 #1832 是准备测试时产生的不计;#1837 是真融合记忆;**#1838「将 #182 与 #256 融合为 #1837……」是转述,该被第 6 条跳过,没跳**。整理完成回执这次没出现(不知道是被跳过还是没生成)。累计两版:该跳的转述 0/4 被跳。样本小(这次只融合一组),但方向一致:`skip_guidance` 对这类按调用类型写的规则,flash 级 observer 基本不遵守。
 
-### 9.4 改用硬规则 `SKIP_BASH_PATTERNS`:对 OpenCode 无效
+### 9.4 改用硬规则 `SKIP_BASH_PATTERNS`:v15.16.0 起对 OpenCode 生效
 
-想法:转述的源头是 observer 看到 `write_memory.py` 等脚本的 Bash 调用,用 `CLAUDE_MEM_SKIP_BASH_PATTERNS` 在入队前按命令文本拦,不靠模型听话。
+想法:转述的源头是 observer 看到 `write_memory.py` 等脚本的 Bash 调用,用 `CLAUDE_MEM_SKIP_BASH_PATTERNS` 在入队前按命令文本拦,不靠模型听话。**v15.12.x 时对 OpenCode 无效,v15.16.0 已修(#5666),下面先记旧版实测与原因,再写新版结论。**
 
-**探针实测(2026-11-10):** 规则 `memory-consolidate/scripts/(write_memory|archive_delete|restore_archive)\.py`,往 `/api/sessions/observations` 发三条完全相同的命令,只改 `tool_name`:
+**探针实测(v15.12.x,2026-11-10):** 规则 `memory-consolidate/scripts/(write_memory|archive_delete|restore_archive)\.py`,往 `/api/sessions/observations` 发三条完全相同的命令,只改 `tool_name`:
 
 | tool_name | 结果 |
 |---|---|
@@ -485,13 +487,18 @@ If skipping, reply with exactly <skip_summary reason="noise" /> (a short reason 
 | `bash` | `queued` |
 | `shell` | `queued` |
 
-**原因(读源码确认):** worker 里取命令文本的函数只认 `Bash`、`PowerShell`(取 `command`)和 `exec_command`(取 `cmd`),是严格相等判断;OpenCode 的命令工具叫小写 `bash`,拿不到命令文本,正则根本没被检查。插件 `~/.config/opencode/plugins/claude-mem.js` 上报前只把 `read/write/edit` 改成首字母大写,没有 `bash`。库里 `tool_uses` 139 条全是小写 `bash`,0 条 `Bash`。
+**旧版原因(v15.12.x,读源码确认):** worker 里取命令文本的函数只认 `Bash`、`PowerShell`(取 `command`)和 `exec_command`(取 `cmd`),是严格相等判断;OpenCode 的命令工具叫小写 `bash`,拿不到命令文本,正则根本没被检查。插件 `~/.config/opencode/plugins/claude-mem.js` 上报前只把 `read/write/edit` 改成首字母大写,没有 `bash`。库里 `tool_uses` 139 条全是小写 `bash`,0 条 `Bash`。
 
-**这条旧结论其实早就在了**(调教清单第 3 轮已写"无效"),这次是重复验证。
+**v15.12.x 时没打补丁的原因:** 插件文件与官方 `dist/opencode-plugin/index.js` 逐字节相同,是安装时拷过来的压缩产物,没进配置仓库的 git,升级或重装会被覆盖且无提示。
 
-**没打补丁的原因:** 插件文件与官方 `dist/opencode-plugin/index.js` 逐字节相同,是安装时拷过来的压缩产物,没进配置仓库的 git,升级或重装会被覆盖且无提示。
+**v15.16.0 复测(2026-11-11):已修(#5666,同类的 PowerShell 问题是 #4745,已由 #4762 修复)。** opencode 插件的映射表把 `bash` 映射成 `Bash`(`read`/`write`/`edit` 同样映射成大写),worker 的 `shellCommandOf` 仍只认 `Bash`/`PowerShell`/`exec_command`。接口实测:`Bash` + 命中 `write_memory.py`/`archive_delete.py` → `skipped`(`bash_pattern_excluded`);小写 `bash` 仍 `queued`(说明起作用的是插件映射,不是 worker 改认小写)。规则本机已配上,原先预留的"上游修了就自动生效"已兑现。
 
-**现状:** 规则已配上,对 OpenCode 不生效,留着无害,上游若让 worker 或插件认小写 `bash` 就会自动生效。已向上游提 issue:https://github.com/thedotmack/claude-mem/issues/5666(同类的 PowerShell 问题是 #4745,已由 #4762 修复)。
+**限制(必须记住):**
+1. 只拦命中规则的脚本调用本身;
+2. 拦不住 `cd` 进目录后用相对路径调用(命令里没有 `scripts/` 前缀);
+3. 拦不住读旧记忆的 `curl .../api/observations/batch`。
+
+对 memory-consolidate 技能文档里的标准调用形态逐条对正则:标准形态、带 `CM_BASE` 前缀、绝对路径、heredoc、管道传标准输入都命中;`cd` 后相对路径和 `curl` 不命中。整条整理链路实际还有哪些环节会入库,见 [[claude-mem-调教清单]] 第 3 轮"整理链路的采集到底拦住了什么"。
 
 ## 10. 没验证的清单
 

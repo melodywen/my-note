@@ -4,7 +4,7 @@ status: developing
 area: growth
 title: "claude-mem 配置详解"
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-11
 tags:
   - learning
   - opencode
@@ -24,7 +24,7 @@ related:
 
 > 一句话:**claude-mem 的全部设置都在 `~/.claude-mem/settings.json` 一个文件里,新手只需要改 5 到 6 个键(观察者提供方、地址、密钥、模型、模式、脱敏开关),其余保持默认;隐私相关的几个键要装完核对一遍。**
 >
-> 基于 claude-mem main 分支(约 v15.12.0)源码,主体是读源码的结论;本机已实测的部分(观察者、向量、跨端)见 [[claude-mem-调教清单]]、[[claude-mem-本地多语言向量方案]]、[[claude-mem-跨端共享]]。
+> 基于 claude-mem main 分支(约 v15.12.0)源码,主体是读源码的结论;238 键清单按 v15.12.0 整理。本机已于 2026-11-11 升到 v15.16.0,升级后键清单未逐项重新核对,其中 SKIP_*、REDACT_* 等条目已按 v15.15.x/v15.16.0 复核;本机已实测的部分(观察者、向量、跨端)见 [[claude-mem-调教清单]]、[[claude-mem-本地多语言向量方案]]、[[claude-mem-跨端共享]]。
 >
 > **想一点点调教?** 看 [[claude-mem-调教清单]]:它从 238 个键里挑出约 40 个,按"先后顺序"分 8 轮,每轮有验证方法和回退值。
 
@@ -191,10 +191,10 @@ npx claude-mem telemetry disable
 
 | 键 | 默认值 | 注释 | 新手 |
 |---|---|---|---|
-| `SKIP_TOOLS` | `ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUserQuestion` | 不记录观察笔记(observation:对一次操作的摘要笔记)的工具名,逗号分隔,默认跳过 ListMcpResourcesTool、SlashCommand、Skill、TodoWrite、AskUserQuestion 这类低价值工具。匹配不区分大小写,OpenCode 的 read 会被适配成 Read 后同样匹配。(src/shared/is-tool-skipped.ts) | 不动 |
-| `SKIP_BASH_PATTERNS` | 空 | 一个正则表达式,命令行类工具(Bash/PowerShell/Codex exec_command)的命令匹配上就不记录。留空=全部记录;想写多个用 \| 连接,如 ^(ls\|cat\|pwd)\b。写错的正则会被忽略(等于没设)。(src/services/worker/http/shared.ts) | 按需 |
-| `SKIP_SUBAGENT_OBSERVATIONS` | `false` | 设为 'true' 则跳过所有子代理(subagent,主 agent 派出去干活的小 agent)产生的观察笔记,默认 false 不跳过。只对同时带 agent id 和 agent type 的子代理事件生效,主 agent 不受影响。(src/shared/should-skip-agent-observation.ts) | 按需 |
-| `SKIP_AGENT_TYPES` | 空 | 按子代理类型(agent_type)精确跳过,逗号分隔,默认空=不跳过;源码注释推荐的值是 workflow-subagent,用来去掉 Dynamic Workflows(动态工作流)大量并发子代理产生的噪音。(src/shared/should-skip-agent-observation.ts) | 按需 |
+| `SKIP_TOOLS` | `ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUserQuestion` | 不记录观察笔记(observation:对一次操作的摘要笔记)的工具名,逗号分隔,默认跳过 ListMcpResourcesTool、SlashCommand、Skill、TodoWrite、AskUserQuestion 这类低价值工具。匹配规则是整名精确相等、不区分大小写、不支持通配符(写 `claude_mem_*` 无效,要逐个列全名)。OpenCode 的 read 会被适配成 Read 后同样匹配。(src/shared/is-tool-skipped.ts) | 不动 |
+| `SKIP_BASH_PATTERNS` | 空 | 一个正则表达式,命令行类工具(Bash/PowerShell/Codex exec_command)的命令匹配上就不记录。留空=全部记录;想写多个用 \| 连接,如 ^(ls\|cat\|pwd)\b。写错的正则会被忽略(等于没设)。**v15.16.0 起对 OpenCode 生效**(上游 #5666 已修):OpenCode 插件的映射表把小写 bash 上报为 Bash(read/write/edit 同样映射成大写),而 worker 的 shellCommandOf 只认 Bash/PowerShell/exec_command,所以现在能命中。接口实测:Bash + 命中脚本 => skipped(bash_pattern_excluded),直接发小写 bash 仍会入队。限制:只拦命中的命令本身,拦不住 cd 之后用相对路径调用脚本、也拦不住用 curl 读旧记忆。(src/services/worker/http/shared.ts) | 按需 |
+| `SKIP_SUBAGENT_OBSERVATIONS` | `false` | 设为 'true' 则跳过所有子代理(subagent,主 agent 派出去干活的小 agent)产生的观察笔记,默认 false 不跳过。只对同时带 agent id 和 agent type 的子代理事件生效,主 agent 不受影响。**对 OpenCode 无效**:判定 subagent 需 agentId 与 agentType 同时存在,而 OpenCode 插件不上报这两个字段。(src/shared/should-skip-agent-observation.ts) | 按需 |
+| `SKIP_AGENT_TYPES` | 空 | 按子代理类型(agent_type)精确跳过,逗号分隔,默认空=不跳过;源码注释推荐的值是 workflow-subagent,用来去掉 Dynamic Workflows(动态工作流)大量并发子代理产生的噪音。同样依赖 agentId 与 agentType,**对 OpenCode 无效**(插件不带这两个字段)。(src/shared/should-skip-agent-observation.ts) | 按需 |
 | `CAPTURE_ADVISOR_CALLS` | `false` | 默认 false。设 true 后,Stop hook(会话停止时触发)会扫描会话记录末尾,把 Claude Code 的 advisor(顾问)工具调用及其建议文本存到本地,仅 worker 运行时有效。(src/cli/handlers/summarize.ts) | 不动 |
 | `DELIVERABLES_ENABLED` | `true` | 默认 true:Stop hook 会把这一轮产出的交付文件复制到 ~/.claude-mem/deliverables/<项目>/ 并记录,供“My Work”页面链接;设 false 则不再复制和记录,但已在里面的文件保留。(src/cli/deliverables-capture.ts) | 不动 |
 | `OBSERVER_ENABLED` | `true` | 记忆采集总开关。只有显式写 'false' 才关闭“新观察笔记和会话摘要”的生成;缺失或写错都按开启处理,避免手误丢记忆。默认 true。(src/shared/observer-capture.ts) | 不动 |
@@ -330,11 +330,11 @@ provider=openai-compatible 时用到的设置,独立于 OpenRouter,不共用 key
 
 | 键 | 默认值 | 注释 | 新手 |
 |---|---|---|---|
-| `REDACT_ENABLED` | `false` | 总开关,默认 false(关)。设为 "true" 后,记忆入库前会把已识别的密钥/口令串替换成 <redacted type='规则名'/> 占位符(这叫脱敏),覆盖工具输入输出、提示词、总结等;内置规则共 35 条:url_credentials(URL 里的密码)、aws_access_key、aws_secret_key、aws_session_token、github_pat、openai_key、anthropic_key、slack_token、jwt、private_key_pem、stripe_key、google_api_key、google_oauth_token、gitlab_token、huggingface_token、npm_token、docker_pat、linear_key、notion_token、sendgrid_key、digitalocean_token、shopify_token、pypi_token、databricks_token、vault_token、nvidia_nim_key、runcrate_key、groq_key、xai_key、perplexity_key、supabase_token、sentry_token、slack_webhook、discord_webhook、claude_mem_key。单个字段超过 100 万字符会整段替换成 oversize 占位符;settings.json 损坏时,若之前开过脱敏会继续保持开启。(src/utils/redaction.ts) | 建议改 |
+| `REDACT_ENABLED` | `false` | 总开关,默认 false(opt-in,源码注释 Opt-in auto-redaction;本机已设为 "true")。设为 "true" 后,记忆入库前会把已识别的密钥/口令串替换成 <redacted type='规则名'/> 占位符(这叫脱敏),覆盖工具输入输出、提示词、总结等;内置规则共 35 条:url_credentials(URL 里的密码)、aws_access_key、aws_secret_key、aws_session_token、github_pat、openai_key、anthropic_key、slack_token、jwt、private_key_pem、stripe_key、google_api_key、google_oauth_token、gitlab_token、huggingface_token、npm_token、docker_pat、linear_key、notion_token、sendgrid_key、digitalocean_token、shopify_token、pypi_token、databricks_token、vault_token、nvidia_nim_key、runcrate_key、groq_key、xai_key、perplexity_key、supabase_token、sentry_token、slack_webhook、discord_webhook、claude_mem_key。单个字段超过 100 万字符会整段替换成 oversize 占位符;settings.json 损坏时,若之前开过脱敏会继续保持开启。v15.15.2 起,REDACT_ENABLED=true 时 server capture 会在数据离开本机前先脱敏,会话元数据入库前也会脱敏(本机是本地 worker 模式,该改动对本机是否实际生效**未核对**)。(src/utils/redaction.ts) | 建议改 |
 | `REDACT_DISABLED_BUILTINS` | 空 | 逗号分隔的规则名清单,列在里面的内置规则会被关掉、其余照常生效,例如 "jwt,slack_token"。规则名就是 REDACT_ENABLED 里列出的那些,也可填 generic_password 等通用规则名。默认空=一条都不关。(src/utils/redaction.ts) | 不动 |
 | `REDACT_CUSTOM_PATTERNS` | `[]` | 自定义脱敏规则:JSON 数组,每项形如 {"name":"规则名","regex":"正则"};它们排在内置规则之前先跑,匹配到的内容同样被替换成 <redacted type='name'/>。缺 name、正则非法或不是数组的项会被忽略并记警告。默认 [] 即没有自定义规则。(src/utils/redaction.ts) | 按需 |
-| `REDACT_LOG_MATCHES` | `false` | 为 true 时,每次脱敏扫描命中后在调试日志里写一行“规则名,命中次数”,只记次数,不记被替换的原文。默认 false。只有 REDACT_ENABLED 开着才会产生日志。(src/utils/redaction.ts) | 不动 |
-| `REDACT_GENERIC_ENABLED` | `false` | 默认 false。在 REDACT_ENABLED 开启的前提下,再额外启用 4 条“没有厂商前缀”的通用规则:generic_password(password=/passwd=/*_PWD= 的值)、generic_token(*_TOKEN/*_SECRET/*_API_KEY 的值,以及配置风格位置的裸 token=/secret=/api_key=)、bearer_token(Authorization: Bearer …)、basic_auth(Authorization: Basic …)。值需 ≥8 位且含字母,所以 max_tokens=4096 这类纯数字不会被误杀,但属于“低置信度”规则,可能误伤。可用 REDACT_DISABLED_BUILTINS 按名关掉其中某条。(src/utils/redaction.ts) | 按需 |
+| `REDACT_LOG_MATCHES` | `false` | 为 true 时,每次脱敏扫描命中后在调试日志里写一行“规则名,命中次数”,只记次数,不记被替换的原文。默认 false,用途是打开后确认脱敏规则确实命中过。只有 REDACT_ENABLED 开着才会产生日志。(src/utils/redaction.ts) | 不动 |
+| `REDACT_GENERIC_ENABLED` | `false` | 默认 false(opt-in;本机已设为 "true")。在 REDACT_ENABLED 开启的前提下,再额外启用 4 条“没有厂商前缀”的通用规则:generic_password(password=/passwd=/*_PWD= 的值)、generic_token(*_TOKEN/*_SECRET/*_API_KEY 的值,以及配置风格位置的裸 token=/secret=/api_key=)、bearer_token(Authorization: Bearer …)、basic_auth(Authorization: Basic …)。值需 ≥8 位且含字母,所以 max_tokens=4096 这类纯数字不会被误杀,但属于“低置信度”规则,可能误伤。可用 REDACT_DISABLED_BUILTINS 按名关掉其中某条。(src/utils/redaction.ts) | 按需 |
 
 ### 13. 会话开始时注入什么
 
@@ -604,7 +604,7 @@ npx claude-mem restart
 
 源码注释(已读)直接承认:默认模型的 30k 词表会把中日韩文字切成单字或 `[UNK]`,这是 Issue #3422 测出的 CJK 召回差距的来源,对应修复讨论在 #3982。
 
-要点:中文关键词检索靠子串匹配,可用;中文笔记"换个说法"的语义检索,默认配置下偏弱,这一条由上面的源码注释佐证,**具体差多少没实测**。详见 [[claude-mem-存储与读取机制]]。
+要点:中文关键词检索靠子串匹配,可用;中文笔记"换个说法"的语义检索,默认配置下偏弱,这一条由上面的源码注释佐证,**具体差多少没实测**。详见 [[claude-mem-存储与读取机制]];检索融合策略(本地模式无 RRF 等)见该篇第五节。
 
 ---
 
@@ -619,7 +619,7 @@ npx claude-mem restart
 - [ ] `CLAUDE_MEM_OPENAI_COMPAT_MODEL` 已填(自定义地址下留空会报错)
 - [ ] `CLAUDE_MEM_PROVIDER` 不是 claude-mem 托管的提供方(登录后选它,每次工具调用的内容会发到第三方)
 - [ ] `CLAUDE_MEM_MODE` 是 `code--zh`(或你自己的模式文件名,且该文件存在)
-- [ ] `CLAUDE_MEM_REDACT_ENABLED` 为开
+- [ ] `CLAUDE_MEM_REDACT_ENABLED` 为开(本机 `REDACT_ENABLED` 与 `REDACT_GENERIC_ENABLED` 均为 `"true"`)
 - [ ] 已执行 `npx claude-mem telemetry disable`
 - [ ] `env | grep CLAUDE_MEM` 没有会覆盖上述值的同名环境变量
 - [ ] 再用 `lsof -i` 或日志确认 worker 没连 `cmem.ai`、`sync.cmem.ai`
